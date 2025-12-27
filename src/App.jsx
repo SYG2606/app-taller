@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, deleteDoc, runTransaction, where, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, deleteDoc, runTransaction, where, getDocs, setDoc } from 'firebase/firestore';
 import { Calendar, Clock, Wrench, User, LogOut, CheckCircle, XCircle, AlertCircle, Bike, ClipboardList, Plus, Loader2, MessageCircle, Shield, Users, Lock, Sun, Moon, Search, Settings, BarChart3, Printer, FileText, Timer, Store, RotateCcw, Eye, EyeOff, Edit, History, Trash2, Image as ImageIcon, Upload } from 'lucide-react';
 
-// --- CONFIGURACIÓN FIREBASE ---
-// Your web app's Firebase configuration
+// --- CONFIGURACIÓN FIREBASE (REAL) ---
 const firebaseConfig = {
   apiKey: "AIzaSyD5BVLXg7XUYm_B6cyv3hRIoYow1W0wWYg",
   authDomain: "turnos-bikes-app-98635.firebaseapp.com",
   projectId: "turnos-bikes-app-98635",
   storageBucket: "turnos-bikes-app-98635.firebasestorage.app",
   messagingSenderId: "93838557270",
-  appId: "mi-taller-bici",
+  appId: "mi-taller-bici", // ID corregido para la web
 };
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = "mi-taller-bici"; // ID fijo para producción
 
 // --- CONSTANTES ---
 const SERVICE_TYPES = [
@@ -129,8 +133,12 @@ export default function TurnosBikesApp() {
   // Init
   useEffect(() => {
     const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
-      else await signInAnonymously(auth);
+      // Intenta usar token si existe (raro en web directa) o anonimo
+      try {
+        await signInAnonymously(auth);
+      } catch (e) {
+        console.error("Error auth", e);
+      }
     };
     initAuth();
     return onAuthStateChanged(auth, (u) => {
@@ -163,7 +171,7 @@ export default function TurnosBikesApp() {
   // --- LOGIC ---
   const saveConfig = async () => {
       try {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), shopConfig);
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), shopConfig);
           setConfigSuccess(true); setTimeout(() => setConfigSuccess(false), 3000); 
       } catch (e) { alert("Error al guardar."); }
   };
@@ -450,7 +458,19 @@ export default function TurnosBikesApp() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{clients.map(client=>{
                 const clientServices=appointments.filter(a=>a.clientDni===client.dni&&a.status==='listo');
                 const lastServiceDate=clientServices.length>0?new Date(Math.max(...clientServices.map(a=>new Date(a.date)))):null;
-                return <Card key={client.id} className="relative group hover:border-slate-600 transition"><div className="flex items-start justify-between mb-2"><div className="flex items-center gap-3"><div className="bg-slate-700 p-2 rounded-full"><User size={20} className="text-slate-300"/></div><div><h3 className="font-bold text-white">{client.name}</h3><p className="text-xs text-slate-500">{client.dni}</p></div></div><button onClick={()=>setEditingClient(client)} className="text-slate-500 hover:text-blue-400 p-1"><Edit size={16}/></button></div><div className="mt-3 pt-3 border-t border-slate-700/50 grid grid-cols-2 gap-2 text-xs"><div className="bg-slate-900/50 p-2 rounded"><div className="text-slate-500 mb-1 flex items-center gap-1"><Wrench size={10} /> Servicios</div><div className="text-lg font-bold text-blue-400">{clientServices.length}</div></div><div className="bg-slate-900/50 p-2 rounded"><div className="text-slate-500 mb-1 flex items-center gap-1"><History size={10} /> Último</div><div className="text-white">{lastServiceDate ? lastServiceDate.toLocaleDateString() : '-'}</div></div></div><div className="mt-3"><button onClick={()=>sendWhatsApp(client.phone,client.name,client.bikeModel||'bici','consulta')} className="w-full flex items-center justify-center gap-2 bg-slate-700 hover:bg-green-900/30 text-slate-300 hover:text-green-500 py-2 rounded text-xs transition-colors"><MessageCircle size={14}/> Contactar</button></div></Card>;
+                return <Card key={client.id} className="relative group hover:border-slate-600 transition">
+                    <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-3"><div className="bg-slate-700 p-2 rounded-full"><User size={20} className="text-slate-300"/></div><div><h3 className="font-bold text-white">{client.name}</h3><p className="text-xs text-slate-500">{client.dni}</p></div></div>
+                        <button onClick={()=>setEditingClient(client)} className="text-slate-500 hover:text-blue-400 p-1"><Edit size={16}/></button>
+                    </div>
+                    {/* SECCIÓN ESTADÍSTICAS RESTAURADA */}
+                    <div className="mt-3 pt-3 border-t border-slate-700/50 grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-slate-900/50 p-2 rounded"><div className="text-slate-500 mb-1 flex items-center gap-1"><Wrench size={10} /> Servicios</div><div className="text-lg font-bold text-blue-400">{clientServices.length}</div></div>
+                        <div className="bg-slate-900/50 p-2 rounded"><div className="text-slate-500 mb-1 flex items-center gap-1"><History size={10} /> Último</div><div className="text-white">{lastServiceDate ? lastServiceDate.toLocaleDateString() : '-'}</div></div>
+                    </div>
+                    {/* FIN SECCIÓN */}
+                    <div className="mt-3"><button onClick={()=>sendWhatsApp(client.phone,client.name,client.bikeModel||'bici','consulta')} className="w-full flex items-center justify-center gap-2 bg-slate-700 hover:bg-green-900/30 text-slate-300 hover:text-green-500 py-2 rounded text-xs transition-colors"><MessageCircle size={14}/> Contactar</button></div>
+                </Card>;
             })}</div></div>}
 
         {subView === 'mechanics-mgmt' && appUser.isAdmin && <div className="max-w-3xl mx-auto"><Card className="mb-8 border-blue-500/30"><h3 className="text-white font-bold mb-4 flex items-center gap-2"><Shield size={20} className="text-blue-500"/> Nuevo Staff</h3><form onSubmit={addMechanic} className="flex flex-col md:flex-row gap-4 items-end"><div className="w-full"><label className="text-xs text-slate-400 block mb-1">Nombre</label><input required value={newMechName} onChange={e=>setNewMechName(e.target.value)} className="w-full bg-slate-700 text-white rounded p-2 text-sm" placeholder="Nombre"/></div><div className="w-full"><label className="text-xs text-slate-400 block mb-1">DNI (Usuario)</label><input required value={newMechDni} onChange={e=>setNewMechDni(e.target.value)} type="number" className="w-full bg-slate-700 text-white rounded p-2 text-sm" placeholder="DNI"/></div><div className="w-full"><label className="text-xs text-slate-400 block mb-1">Contraseña ({GENERIC_PASS})</label><input required value={newMechPassword} onChange={e=>setNewMechPassword(e.target.value)} type="text" className="w-full bg-slate-700 text-white rounded p-2 text-sm"/></div><div className="flex items-center gap-2 pb-2"><input type="checkbox" checked={newMechIsAdmin} onChange={e=>setNewMechIsAdmin(e.target.checked)}/><label className="text-sm text-slate-300">Admin?</label></div><Button type="submit" variant="admin"><Plus size={16}/> Crear</Button></form></Card><div className="space-y-3">{mechanics.map(m=><div key={m.id} className="flex justify-between bg-slate-800 p-4 rounded-lg border border-slate-700"><div className="flex gap-3"><div className={`p-2 rounded-full ${m.isAdmin?'bg-blue-600/20':'bg-slate-700'}`}>{m.isAdmin?<Shield size={20} className="text-blue-400"/>:<Wrench size={20} className="text-slate-400"/>}</div><div><p className="text-white font-medium">{m.name}</p><p className="text-sm text-slate-500">{m.dni}</p></div></div><div className="flex gap-2"><Button variant="secondary" className="py-1 px-3" onClick={()=>triggerResetPassword(m.id, m.name)}><RotateCcw size={14}/></Button><Button variant="danger" className="py-1 px-3" onClick={()=>triggerRemoveMechanic(m.id, m.name)}><Trash2 size={14}/></Button></div></div>)}</div></div>}
