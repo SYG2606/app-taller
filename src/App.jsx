@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, deleteDoc, runTransaction, where, getDocs, setDoc } from 'firebase/firestore';
-import { Calendar, Clock, Wrench, User, LogOut, CheckCircle, XCircle, AlertCircle, Bike, ClipboardList, Plus, Loader2, MessageCircle, Shield, Users, Lock, Sun, Moon, Search, Settings, BarChart3, Printer, FileText, Timer, Store, RotateCcw, Eye, EyeOff, Edit, History, Trash2, Image as ImageIcon, Upload } from 'lucide-react';
+import { Calendar, Clock, Wrench, User, LogOut, CheckCircle, XCircle, AlertCircle, Bike, ClipboardList, Plus, Loader2, MessageCircle, Shield, Users, Lock, Sun, Moon, Search, Settings, BarChart3, Printer, FileText, Timer, Store, RotateCcw, Eye, EyeOff, Edit, History, Trash2, Image as ImageIcon, Upload, ArrowRight } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE (REAL) ---
 const firebaseConfig = {
@@ -11,13 +11,20 @@ const firebaseConfig = {
   projectId: "turnos-bikes-app-98635",
   storageBucket: "turnos-bikes-app-98635.firebasestorage.app",
   messagingSenderId: "93838557270",
-  appId: "mi-taller-bici", // ID corregido para la web
+  appId: "mi-taller-bici", 
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = "mi-taller-bici"; // ID fijo para producción
+// Inicialización segura de Firebase
+let app, auth, db;
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (e) {
+  console.error("Error inicializando Firebase:", e);
+}
+
+const appId = "mi-taller-bici";
 
 // --- CONSTANTES ---
 const SERVICE_TYPES = [
@@ -87,6 +94,7 @@ export default function TurnosBikesApp() {
   const [mechanics, setMechanics] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
   
   // Config
   const [shopConfig, setShopConfig] = useState({ workDays: [1, 3, 5], shopName: 'Turnos Bikes', shopAddress: 'Calle Falsa 123', shopPhone: '11 2233 4455', maxPerDay: 4, logoUrl: '', lastOrderNumber: 1000 });
@@ -133,31 +141,62 @@ export default function TurnosBikesApp() {
 
   // Init
   useEffect(() => {
+    let isMounted = true;
     const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
-      else await signInAnonymously(auth);
-    };
-    initAuth();
-    return onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (u) {
-        const savedUser = localStorage.getItem('bikes_app_user_v8');
-        if (savedUser) {
-          const parsed = JSON.parse(savedUser);
-          if (parsed && parsed.dni) {
-            setAppUser(parsed);
-            setView(parsed.role === 'mechanic' ? 'mechanic-dashboard' : 'client-dashboard');
-            if (parsed.role === 'client') setClientBikeModel(parsed.bikeModel || '');
-          }
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) { 
+        console.warn("Auth Custom Token Error, attempting anonymous fallback:", err);
+        // Fallback to anonymous if token fails
+        try {
+            await signInAnonymously(auth);
+        } catch (anonErr) {
+            if (isMounted) {
+                setAuthError(`No se pudo conectar con Firebase. (${anonErr.code})`);
+                setLoading(false);
+            }
         }
       }
-      setLoading(false);
-    });
+    };
+    
+    if (auth) {
+        initAuth();
+        const unsubscribe = onAuthStateChanged(auth, (u) => {
+          if (!isMounted) return;
+          setUser(u);
+          if (u) {
+            const savedUser = localStorage.getItem('bikes_app_user_v8');
+            if (savedUser) {
+              const parsed = JSON.parse(savedUser);
+              if (parsed && parsed.dni) {
+                setAppUser(parsed);
+                setView(parsed.role === 'mechanic' ? 'mechanic-dashboard' : 'client-dashboard');
+                if (parsed.role === 'client') setClientBikeModel(parsed.bikeModel || '');
+              }
+            }
+          }
+          setLoading(false);
+        }, (err) => {
+            console.error("Auth Listener Error", err);
+            if (isMounted) {
+                 setAuthError("Error de sesión: " + err.message);
+                 setLoading(false);
+            }
+        });
+        return () => { isMounted = false; unsubscribe(); };
+    } else {
+        setAuthError("Firebase no se inicializó correctamente.");
+        setLoading(false);
+    }
   }, []);
 
   // Data Sync
   useEffect(() => {
-    if (!user) return;
+    if (!user || !db) return;
     const unsub1 = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), s => s.exists() && setShopConfig(p => ({...p, ...s.data()})));
     const unsub2 = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'turnos')), s => setAppointments(s.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>new Date(a.date)-new Date(b.date))));
     const unsub3 = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'mechanics')), s => setMechanics(s.docs.map(d => ({id:d.id, ...d.data()}))));
@@ -383,7 +422,7 @@ export default function TurnosBikesApp() {
             const count = appointments.filter(a=>a.dateString===ds && a.status!=='cancelado').length;
             const full = count >= shopConfig.maxPerDay;
             const sel = selectedDate && formatDateForQuery(selectedDate) === ds;
-            return <button key={i} onClick={()=>!full && setSelectedDate(d)} disabled={full} className={`p-3 rounded-xl border text-left transition-all ${full?'bg-slate-800/50 border-slate-700 opacity-50 cursor-not-allowed':sel?'bg-orange-600 border-orange-500 ring-2 ring-orange-500/30 shadow-lg':'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}><div className="flex justify-between items-start mb-1"><span className={`text-sm font-bold ${full?'text-slate-500':'text-white'}`}>{formatDisplayDate(d).dayName}</span>{full?<XCircle size={14} className="text-red-500"/>:<CheckCircle size={14} className="text-emerald-500"/>}</div><div className="text-xs text-slate-400">{formatDisplayDate(d).date}</div><div className={`mt-2 text-xs font-semibold ${full?'text-red-400':'text-emerald-400'}`}>{full?'Agotado':`${shopConfig.maxPerDay-count} libres`}</div></button>
+            return <button key={i} onClick={()=>!full && setSelectedDate(d)} disabled={full} className={`p-3 rounded-xl border text-left transition-all ${full?'bg-slate-800/50 border-slate-700 opacity-50 cursor-not-allowed':sel?'bg-orange-600 border-orange-500 ring-2 ring-orange-500/30 shadow-lg':'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}><div className="flex justify-between items-start mb-1"><span className={`text-sm font-bold ${full?'text-slate-500':'text-white'}`}>{formatDisplayDate(d).dayName}</span>{full?<XCircle size={14} className="text-red-500"/>:<CheckCircle size={14} className="text-emerald-500"/>}</div><div className="text-xs text-slate-300">{formatDisplayDate(d).date}</div><div className={`mt-2 text-xs font-semibold ${full?'text-red-400':'text-emerald-400'}`}>{full?'Agotado':`${shopConfig.maxPerDay-count} libres`}</div></button>
         })}
       </div>
     );
@@ -402,9 +441,18 @@ export default function TurnosBikesApp() {
     const win = window.open('','','width=900,height=600'); win.document.write(content); win.document.close(); win.print();
   };
 
-  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-orange-500 gap-2"><Loader2 className="animate-spin"/> Cargando...</div>;
+  if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-orange-500 gap-2"><Loader2 className="animate-spin"/> Cargando...</div>;
 
   // --- VIEWS ---
+  if (authError) return (
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4">
+        <AlertCircle size={48} className="text-red-500 mb-4"/>
+        <h2 className="text-xl font-bold mb-2">Error de Sistema</h2>
+        <p className="text-slate-400 text-center">{authError}</p>
+        <p className="text-xs text-slate-600 mt-4 text-center">Verifica que "localhost" o tu dominio de Vercel estén en Firebase Auth &gt; Settings &gt; Authorized Domains.</p>
+    </div>
+  );
+
   if (view === 'force-change-password') return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4"><div className="max-w-md w-full"><div className="text-center mb-8"><div className="w-20 h-20 bg-orange-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce shadow-xl shadow-orange-900/40"><Lock size={36} className="text-white"/></div><h1 className="text-2xl font-bold text-white">Cambio Obligatorio</h1><p className="text-slate-400 mt-2">Por seguridad, actualiza tu contraseña temporal.</p></div><Card className="border-orange-500/30"><form onSubmit={handleChangePassword} className="space-y-4"><input type="password" required className="w-full bg-slate-900/50 text-white rounded-lg p-3 border border-slate-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all" value={newPasswordForm.new} onChange={e=>setNewPasswordForm({...newPasswordForm,new:e.target.value})} placeholder="Nueva Clave" /><input type="password" required className="w-full bg-slate-900/50 text-white rounded-lg p-3 border border-slate-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all" value={newPasswordForm.confirm} onChange={e=>setNewPasswordForm({...newPasswordForm,confirm:e.target.value})} placeholder="Confirmar" /><Button type="submit" className="w-full mt-4 py-3">Actualizar Clave</Button></form></Card></div></div>
   );
@@ -446,7 +494,7 @@ export default function TurnosBikesApp() {
 
   if (view === 'client-dashboard') return (
     <div className="min-h-screen bg-slate-950 pb-20"><Header /><main className="max-w-5xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2"><h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><span className="bg-orange-600/20 text-orange-500 p-2 rounded-lg"><Plus size={24}/></span> Reservar Nuevo Turno</h2><Card><div className="mb-8"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">1. Selecciona un Día</h3>{renderDateSelector()}</div>{selectedDate && <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">2. Elige Horario</h3><div className="grid grid-cols-2 gap-4"><button onClick={()=>setSelectedTimeBlock('morning')} className={`p-5 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-300 ${selectedTimeBlock==='morning'?'bg-orange-600 border-orange-500 text-white shadow-orange-900/20 shadow-xl scale-[1.02]':'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'}`}><Sun size={28}/><span>Mañana</span><span className="text-xs opacity-60 font-mono bg-black/20 px-2 py-0.5 rounded">08:00 - 10:00</span></button><button onClick={()=>setSelectedTimeBlock('afternoon')} className={`p-5 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-300 ${selectedTimeBlock==='afternoon'?'bg-orange-600 border-orange-500 text-white shadow-orange-900/20 shadow-xl scale-[1.02]':'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'}`}><Moon size={28}/><span>Tarde</span><span className="text-xs opacity-60 font-mono bg-black/20 px-2 py-0.5 rounded">17:30 - 19:00</span></button></div></div>}{selectedDate && selectedTimeBlock && <div className="animate-in fade-in slide-in-from-top-4 duration-500"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">3. Confirmar Reserva</h3><div className="space-y-4 bg-slate-900/50 p-6 rounded-2xl border border-slate-800 mb-6"><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Tu Bici (Puedes editarla):</label><input value={clientBikeModel} onChange={e=>setClientBikeModel(e.target.value)} className="w-full bg-slate-800 border-slate-700 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Ej: SLP 29 Pro" /></div><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Servicio:</label><select value={serviceType} onChange={e=>setServiceType(e.target.value)} className="w-full bg-slate-800 border-slate-700 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none">{SERVICE_TYPES.map(s=><option key={s} value={s}>{s}</option>)}</select></div><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Notas Adicionales:</label><textarea value={apptNotes} onChange={e=>setApptNotes(e.target.value)} rows="2" className="w-full bg-slate-800 border-slate-700 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none resize-none" placeholder="¿Algún ruido raro? ¿Detalle específico?"/></div></div><Button onClick={createClientAppointment} className="w-full py-4 text-lg shadow-orange-900/40">Confirmar Reserva</Button></div>}</Card></div>
+        <div className="lg:col-span-2"><h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><span className="bg-orange-600/20 text-orange-500 p-2 rounded-lg"><Plus size={24}/></span> Reservar Nuevo Turno</h2><Card><div className="mb-8"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">1. Selecciona un Día</h3>{renderDateSelector()}</div>{selectedDate && <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">2. Elige Horario</h3><div className="grid grid-cols-2 gap-4"><button onClick={()=>setSelectedTimeBlock('morning')} className={`p-5 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-300 ${selectedTimeBlock==='morning'?'bg-orange-600 border-orange-500 text-white shadow-orange-900/20 shadow-xl scale-[1.02]':'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'}`}><Sun size={28}/><span>Mañana</span><span className="text-xs opacity-60 font-mono bg-black/20 px-2 py-0.5 rounded">08:00 - 10:00</span></button><button onClick={()=>setSelectedTimeBlock('afternoon')} className={`p-5 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-300 ${selectedTimeBlock==='afternoon'?'bg-orange-600 border-orange-500 text-white shadow-orange-900/20 shadow-xl scale-[1.02]':'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'}`}><Moon size={28}/><span>Tarde</span><span className="text-xs opacity-60 font-mono bg-black/20 px-2 py-0.5 rounded">17:30 - 19:00</span></button></div></div>}{selectedDate && selectedTimeBlock && <div className="animate-in fade-in slide-in-from-top-4 duration-500"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">3. Confirmar Reserva</h3><div className="space-y-4 bg-slate-900/50 p-6 rounded-2xl border border-slate-800 mb-6"><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Tu Bici (Puedes editarla):</label><input value={clientBikeModel} onChange={e=>setClientBikeModel(e.target.value)} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="Ej: SLP 29 Pro" /></div><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Servicio:</label><select value={serviceType} onChange={e=>setServiceType(e.target.value)} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none">{SERVICE_TYPES.map(s=><option key={s} value={s}>{s}</option>)}</select></div><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Notas Adicionales:</label><textarea value={apptNotes} onChange={e=>setApptNotes(e.target.value)} rows="2" className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none resize-none" placeholder="¿Algún ruido raro? ¿Detalle específico?"/></div></div><Button onClick={createClientAppointment} className="w-full py-4 text-lg shadow-orange-900/40">Confirmar Reserva</Button></div>}</Card></div>
         <div className="lg:col-span-1 space-y-6"><h2 className="text-xl font-bold text-white mb-4 flex items-center gap-3"><span className="bg-slate-800 text-slate-400 p-2 rounded-lg"><ClipboardList size={24}/></span> Mis Turnos</h2>{appointments.filter(a=>a.clientDni===appUser.dni).length===0?<div className="text-center py-16 bg-slate-900/50 rounded-3xl border-2 border-dashed border-slate-800"><Bike className="mx-auto text-slate-700 mb-4" size={64}/><p className="text-slate-500 font-medium">No tienes turnos activos.</p></div>:appointments.filter(a=>a.clientDni===appUser.dni).map(appt=><Card key={appt.id} className="relative group overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Bike size={80}/></div><div className="flex flex-col gap-3 relative z-10"><div className="flex justify-between items-center mb-1"><Badge status={appt.status}/><span className="text-xs font-mono text-slate-500 bg-slate-900 px-2 py-1 rounded">#{appt.orderId}</span></div><div><h3 className="text-lg font-bold text-white leading-tight">{appt.serviceType}</h3><p className="text-slate-400 text-sm mt-1">{appt.bikeModel}</p></div><div className="flex items-center gap-3 mt-2 bg-slate-900/60 p-3 rounded-xl text-sm text-slate-300 border border-slate-800"><Calendar size={16} className="text-orange-500"/><div className="flex flex-col leading-none"><span className="text-xs text-slate-500 font-bold uppercase">Fecha</span><span>{new Date(appt.date).toLocaleDateString()} • {appt.timeBlock==='morning'?'Mañana':'Tarde'}</span></div></div></div></Card>)}</div>
     </main></div>
   );
@@ -484,19 +532,14 @@ export default function TurnosBikesApp() {
 
         {subView === 'clients' && appUser.isAdmin && <div className="space-y-6">
             {editingClient && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200"><Card className="w-full max-w-md relative bg-slate-900 border-slate-700 shadow-2xl"><button onClick={()=>setEditingClient(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle/></button><h3 className="text-2xl font-bold text-white mb-6">Editar Cliente</h3><form onSubmit={handleUpdateClient} className="space-y-4"><div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Nombre</label><input value={editingClient.name} onChange={e=>setEditingClient({...editingClient,name:e.target.value})} className="w-full bg-slate-950 text-white rounded-xl p-3 border border-slate-800 focus:border-blue-500 outline-none transition"/></div><div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Teléfono</label><input value={editingClient.phone} onChange={e=>setEditingClient({...editingClient,phone:e.target.value})} className="w-full bg-slate-950 text-white rounded-xl p-3 border border-slate-800 focus:border-blue-500 outline-none transition"/></div><div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Bici (Default)</label><input value={editingClient.bikeModel} onChange={e=>setEditingClient({...editingClient,bikeModel:e.target.value})} className="w-full bg-slate-950 text-white rounded-xl p-3 border border-slate-800 focus:border-blue-500 outline-none transition"/></div><Button type="submit" className="w-full py-3 mt-2">Guardar Cambios</Button></form></Card></div>}
-            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{clients.map(client=>{
                 const clientServices=appointments.filter(a=>a.clientDni===client.dni&&a.status==='listo');
                 const lastServiceDate=clientServices.length>0?new Date(Math.max(...clientServices.map(a=>new Date(a.date)))):null;
                 return <Card key={client.id} className="relative group hover:border-slate-600 transition"><div className="flex items-start justify-between mb-4"><div className="flex items-center gap-3"><div className="bg-slate-800 p-3 rounded-full border border-slate-700 shadow-inner"><User size={24} className="text-slate-300"/></div><div><h3 className="font-bold text-white text-lg">{client.name}</h3><p className="text-xs text-slate-500 font-mono bg-slate-900 px-1.5 py-0.5 rounded w-fit">DNI: {client.dni}</p></div></div><button onClick={()=>setEditingClient(client)} className="text-slate-600 hover:text-blue-400 p-2 rounded-lg hover:bg-blue-500/10 transition"><Edit size={18}/></button></div>
-                
-                {/* --- SECCIÓN ESTADÍSTICAS RESTAURADA --- */}
                 <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-2 gap-3 text-xs">
                     <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-center"><div className="text-slate-500 mb-1 flex items-center justify-center gap-1 font-bold uppercase tracking-wider"><Wrench size={12}/> Servicios</div><div className="text-xl font-bold text-blue-400">{clientServices.length}</div></div>
                     <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-center"><div className="text-slate-500 mb-1 flex items-center justify-center gap-1 font-bold uppercase tracking-wider"><History size={12}/> Último</div><div className="text-sm font-medium text-slate-300">{lastServiceDate ? lastServiceDate.toLocaleDateString() : '-'}</div></div>
                 </div>
-                {/* -------------------------------------- */}
-
                 <div className="mt-4"><button onClick={()=>sendWhatsApp(client.phone,client.name,client.bikeModel||'bici','consulta')} className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-green-600 hover:text-white text-slate-300 py-3 rounded-xl text-sm font-medium transition-all border border-slate-700 hover:border-green-500 shadow-sm"><MessageCircle size={16}/> Contactar WhatsApp</button></div></Card>;
             })}</div></div>}
 
