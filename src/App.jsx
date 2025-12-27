@@ -54,9 +54,9 @@ const calculateDuration = (start, end) => {
 // --- COMPONENTES UI ---
 const Button = ({ children, onClick, variant = 'primary', className = '', disabled, ...props }) => {
   const variants = {
-    primary: 'bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-500 hover:to-orange-600 text-white shadow-lg shadow-orange-900/20 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500',
+    primary: 'bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-900/20 disabled:bg-slate-700 disabled:text-slate-500',
     secondary: 'bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600 hover:border-slate-500',
-    admin: 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white shadow-lg shadow-blue-900/20',
+    admin: 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20',
     danger: 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20',
     success: 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20',
     whatsapp: 'bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/20',
@@ -150,13 +150,11 @@ export default function TurnosBikesApp() {
           await signInAnonymously(auth);
         }
       } catch (err) { 
-        console.warn("Auth Custom Token Error, attempting anonymous fallback:", err);
-        // Fallback to anonymous if token fails
-        try {
-            await signInAnonymously(auth);
-        } catch (anonErr) {
-            if (isMounted) {
-                setAuthError(`No se pudo conectar con Firebase. (${anonErr.code})`);
+        console.error("Auth Error", err);
+        // Intentar fallback si falla el token custom
+        try { await signInAnonymously(auth); } catch (e) {
+             if (isMounted) {
+                setAuthError(`No se pudo conectar con la base de datos. (${err.code || e.code})`);
                 setLoading(false);
             }
         }
@@ -216,7 +214,7 @@ export default function TurnosBikesApp() {
       try {
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), shopConfig, { merge: true });
           setConfigSuccess(true); setTimeout(() => setConfigSuccess(false), 3000); 
-      } catch (e) { alert("Error al guardar."); }
+      } catch (e) { alert("Error al guardar: " + e.message); }
   };
 
   const handleLogoUpload = (e) => {
@@ -241,6 +239,7 @@ export default function TurnosBikesApp() {
   };
 
   const createClientAppointment = async () => {
+    if (!user) return alert("Error: No estás conectado al sistema. Recarga la página.");
     if (!selectedDate || !selectedTimeBlock) return alert("Falta fecha/hora");
     if (appointments.filter(a => a.clientId === user.uid && ['pendiente','recibido','en-proceso'].includes(a.status)).length >= 3) return alert("Máximo 3 turnos activos.");
     
@@ -255,11 +254,15 @@ export default function TurnosBikesApp() {
         timeBlock: selectedTimeBlock, notes: apptNotes, status: 'pendiente', createdBy: 'client', createdAt: new Date().toISOString()
       });
       alert(`¡Turno #${orderNum} Reservado!`); setSelectedDate(null);
-    } catch (e) { alert("Error al reservar"); }
+    } catch (e) { 
+        console.error(e);
+        alert("Error al reservar: " + e.message); 
+    }
   };
 
   const createAdminAppointment = async (e) => {
     e.preventDefault();
+    if (!user) return alert("Error: Sin conexión a base de datos.");
     if (!adminFormData.date || !adminFormData.phone || !adminFormData.bikeModel) return alert("Faltan datos");
     try {
         const d = new Date(adminFormData.date);
@@ -270,7 +273,7 @@ export default function TurnosBikesApp() {
             date: d.toISOString(), dateString: formatDateForQuery(d), notes: 'Agendado por Staff', status: 'pendiente', createdBy: 'mechanic', createdAt: new Date().toISOString()
         });
         alert(`Turno #${orderNum} creado.`); setShowAdminApptModal(false); setAdminFormData({ bikeModel: '', phone: '', date: '', serviceType: SERVICE_TYPES[0] });
-    } catch (e) { alert("Error al crear"); }
+    } catch (e) { alert("Error al crear: " + e.message); }
   };
 
   const handleStaffLogin = async (e) => {
@@ -342,14 +345,17 @@ export default function TurnosBikesApp() {
 
   const addMechanic = async (e) => {
       e.preventDefault();
+      if(!user) return alert("Sin conexión. Recarga.");
       if(!newMechDni || !newMechName) return alert("Faltan datos");
       
       if (mechanics.some(m => m.dni === newMechDni)) return alert("DNI ya registrado");
 
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mechanics'), {
-          dni: newMechDni, name: newMechName, password: newMechPassword, isAdmin: newMechIsAdmin, forcePasswordChange: true, createdAt: new Date().toISOString()
-      });
-      setNewMechDni(''); setNewMechName(''); setNewMechPassword(GENERIC_PASS); alert("Staff agregado.");
+      try {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mechanics'), {
+            dni: newMechDni, name: newMechName, password: newMechPassword, isAdmin: newMechIsAdmin, forcePasswordChange: true, createdAt: new Date().toISOString()
+        });
+        setNewMechDni(''); setNewMechName(''); setNewMechPassword(GENERIC_PASS); alert("Staff agregado correctamente.");
+      } catch (err) { alert("Error al crear usuario: " + err.message); }
   };
 
   const triggerResetPassword = (id, name) => {
@@ -360,7 +366,7 @@ export default function TurnosBikesApp() {
               try { 
                   await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mechanics', id), { password: GENERIC_PASS, forcePasswordChange: true }); 
                   alert("Contraseña restablecida."); 
-              } catch (err) { console.error(err); alert("Error."); }
+              } catch (err) { console.error(err); alert("Error: " + err.message); }
               setConfirmModal(null);
           }
       });
@@ -374,7 +380,7 @@ export default function TurnosBikesApp() {
               try {
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mechanics', id));
                 alert("Usuario eliminado.");
-              } catch(e) { console.error(e); alert("Error al eliminar"); }
+              } catch(e) { console.error(e); alert("Error al eliminar: " + e.message); }
               setConfirmModal(null);
           }
       });
@@ -414,7 +420,12 @@ export default function TurnosBikesApp() {
 
   const renderDateSelector = () => {
     const dates = []; let d = new Date(); d.setDate(d.getDate()+1);
-    while (dates.length < 6) { if(shopConfig.workDays.includes(d.getDay())) dates.push(new Date(d)); d.setDate(d.getDate()+1); }
+    let loops = 0;
+    while (dates.length < 6 && loops < 60) { 
+        if(shopConfig.workDays.includes(d.getDay())) dates.push(new Date(d)); 
+        d.setDate(d.getDate()+1);
+        loops++;
+    }
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
         {dates.map((d,i) => {
@@ -458,7 +469,7 @@ export default function TurnosBikesApp() {
   );
 
   if (view === 'login') return (
-    <div className={`min-h-screen flex items-center justify-center p-4 transition-all duration-700 ${isStaffLogin?'bg-slate-950':'bg-slate-900'}`}><div className="max-w-md w-full"><div className="text-center mb-8"><div className={`w-24 h-24 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl transition-all duration-500 ${isStaffLogin?'bg-blue-600 shadow-blue-900/40 rotate-3':'bg-orange-600 shadow-orange-900/40 -rotate-3'} overflow-hidden`}>{shopConfig.logoUrl?<img src={shopConfig.logoUrl} className="w-full h-full object-cover"/>:(isStaffLogin?<Shield size={48} className="text-white"/>:<Bike size={48} className="text-white"/>)}</div><h1 className="text-4xl font-bold text-white mb-2 tracking-tight">{shopConfig.shopName}</h1><p className={`text-sm font-medium tracking-wide uppercase ${isStaffLogin?'text-blue-400':'text-slate-400'}`}>{isStaffLogin?'Acceso Administrativo':'Portal de Clientes'}</p></div><Card className={`${isStaffLogin?'border-blue-500/30':'border-slate-700'}`}>
+    <div className={`min-h-screen flex items-center justify-center p-4 transition-all duration-700 ${isStaffLogin?'bg-slate-950':'bg-slate-900'}`}><div className="max-w-md w-full"><div className="text-center mb-8"><div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl transition-all duration-500 ${isStaffLogin?'bg-blue-600 shadow-blue-900/40':'bg-orange-600 shadow-orange-900/40'} overflow-hidden`}>{shopConfig.logoUrl?<img src={shopConfig.logoUrl} className="w-full h-full object-cover"/>:(isStaffLogin?<Shield size={48} className="text-white"/>:<Bike size={48} className="text-white"/>)}</div><h1 className="text-4xl font-bold text-white mb-2 tracking-tight">{shopConfig.shopName}</h1><p className={`text-sm font-medium tracking-wide uppercase ${isStaffLogin?'text-blue-400':'text-slate-400'}`}>{isStaffLogin?'Acceso Administrativo':'Portal de Clientes'}</p></div><Card className={`${isStaffLogin?'border-blue-500/30':'border-slate-700'}`}>
         {isStaffLogin ? (
             <form onSubmit={handleStaffLogin} className="space-y-4">
                 {mechanics.length===0 && <div className="bg-blue-500/10 border border-blue-500/50 p-4 rounded-xl mb-4 text-sm text-blue-200 text-center shadow-lg"><p className="font-bold mb-1">¡Bienvenido!</p>Serás el <strong>Primer Admin</strong>. Esta clave será la definitiva.</div>}
@@ -532,6 +543,7 @@ export default function TurnosBikesApp() {
 
         {subView === 'clients' && appUser.isAdmin && <div className="space-y-6">
             {editingClient && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200"><Card className="w-full max-w-md relative bg-slate-900 border-slate-700 shadow-2xl"><button onClick={()=>setEditingClient(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle/></button><h3 className="text-2xl font-bold text-white mb-6">Editar Cliente</h3><form onSubmit={handleUpdateClient} className="space-y-4"><div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Nombre</label><input value={editingClient.name} onChange={e=>setEditingClient({...editingClient,name:e.target.value})} className="w-full bg-slate-950 text-white rounded-xl p-3 border border-slate-800 focus:border-blue-500 outline-none transition"/></div><div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Teléfono</label><input value={editingClient.phone} onChange={e=>setEditingClient({...editingClient,phone:e.target.value})} className="w-full bg-slate-950 text-white rounded-xl p-3 border border-slate-800 focus:border-blue-500 outline-none transition"/></div><div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Bici (Default)</label><input value={editingClient.bikeModel} onChange={e=>setEditingClient({...editingClient,bikeModel:e.target.value})} className="w-full bg-slate-950 text-white rounded-xl p-3 border border-slate-800 focus:border-blue-500 outline-none transition"/></div><Button type="submit" className="w-full py-3 mt-2">Guardar Cambios</Button></form></Card></div>}
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{clients.map(client=>{
                 const clientServices=appointments.filter(a=>a.clientDni===client.dni&&a.status==='listo');
                 const lastServiceDate=clientServices.length>0?new Date(Math.max(...clientServices.map(a=>new Date(a.date)))):null;
