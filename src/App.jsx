@@ -139,6 +139,19 @@ export default function TurnosBikesApp() {
   const [newMechPassword, setNewMechPassword] = useState(GENERIC_PASS);
   const [newMechIsAdmin, setNewMechIsAdmin] = useState(false);
 
+  // --- HOTFIX: Inyectar Tailwind CSS CDN ---
+  // Esto soluciona el problema visual si el entorno no tiene Tailwind instalado
+  useEffect(() => {
+    const scriptId = 'tailwind-cdn-style';
+    if (!document.getElementById(scriptId)) {
+        const script = document.createElement('script');
+        script.id = scriptId;
+        script.src = "https://cdn.tailwindcss.com";
+        script.async = true;
+        document.head.appendChild(script);
+    }
+  }, []);
+
   // Init
   useEffect(() => {
     let isMounted = true;
