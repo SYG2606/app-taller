@@ -4,6 +4,7 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, 
 import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, deleteDoc, runTransaction, where, getDocs, setDoc } from 'firebase/firestore';
 import { Calendar, Clock, Wrench, User, LogOut, CheckCircle, XCircle, AlertCircle, Bike, ClipboardList, Plus, Loader2, MessageCircle, Shield, Users, Lock, Sun, Moon, Search, Settings, BarChart3, Printer, FileText, Timer, Store, RotateCcw, Eye, EyeOff, Edit, History, Trash2, Image as ImageIcon, Upload, ArrowRight, Filter, Layout, List, CalendarX, Mail } from 'lucide-react';
 
+// --- CONFIGURACIÓN FIREBASE (ADAPTADA AL ENTORNO) ---
 // --- CONFIGURACIÓN FIREBASE (REAL) ---
 const firebaseConfig = {
   apiKey: "AIzaSyD5BVLXg7XUYm_B6cyv3hRIoYow1W0wWYg",
@@ -32,7 +33,7 @@ const SERVICE_TYPES = [
   "Mantenimiento General (Particular)",
   "Revisión 7 días (Ajuste)",
   "Armado de Bike",
-  "Cambio y Ajustes de Partes"
+  "Cambio y Ajustes de  Partes"
 ];
 const GENERIC_PASS = "Taller2025"; 
 
@@ -100,7 +101,7 @@ export default function App() {
     maxPerDay: 4, 
     logoUrl: '', 
     lastOrderNumber: 1000,
-    blockedDates: [] // ["2023-12-25", "2024-01-01"]
+    blockedDates: [] 
   });
   const [configSuccess, setConfigSuccess] = useState(false);
   const [dateToBlock, setDateToBlock] = useState('');
@@ -148,6 +149,19 @@ export default function App() {
   const [newMechName, setNewMechName] = useState('');
   const [newMechPassword, setNewMechPassword] = useState(GENERIC_PASS);
   const [newMechIsAdmin, setNewMechIsAdmin] = useState(false);
+
+  // --- HOTFIX: Inyectar Tailwind CSS CDN ---
+  // Esto es lo que faltaba para que se vean los colores
+  useEffect(() => {
+    const scriptId = 'tailwind-cdn-style';
+    if (!document.getElementById(scriptId)) {
+        const script = document.createElement('script');
+        script.id = scriptId;
+        script.src = "https://cdn.tailwindcss.com";
+        script.async = true;
+        document.head.appendChild(script);
+    }
+  }, []);
 
   // Init Auth
   useEffect(() => {
