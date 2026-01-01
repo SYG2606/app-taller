@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, deleteDoc, runTransaction, where, getDocs, setDoc } from 'firebase/firestore';
-import { Calendar, Clock, Wrench, User, LogOut, CheckCircle, XCircle, AlertCircle, Bike, ClipboardList, Plus, Loader2, MessageCircle, Shield, Users, Lock, Sun, Moon, Search, Settings, BarChart3, Printer, FileText, Timer, Store, RotateCcw, Eye, EyeOff, Edit, History, Trash2, Image as ImageIcon, Upload, ArrowRight, Filter, Layout, List } from 'lucide-react';
+import { Calendar, Clock, Wrench, User, LogOut, CheckCircle, XCircle, AlertCircle, Bike, ClipboardList, Plus, Loader2, MessageCircle, Shield, Users, Lock, Sun, Moon, Search, Settings, BarChart3, Printer, FileText, Timer, Store, RotateCcw, Eye, EyeOff, Edit, History, Trash2, Image as ImageIcon, Upload, ArrowRight, Filter, Layout, List, CalendarX, Mail } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE (REAL) ---
 const firebaseConfig = {
@@ -28,11 +28,11 @@ const appId = "mi-taller-bici";
 
 // --- CONSTANTES ---
 const SERVICE_TYPES = [
-  "Mantenimiento General (30 días -> PostVenta)",
+  "Mantenimiento General (30 días -> PostCompra)",
   "Mantenimiento General (Particular)",
   "Revisión 7 días (Ajuste)",
   "Armado de Bike",
-  "Cambio y ajustes de  partes"
+  "Cambio y Ajustes de Partes"
 ];
 const GENERIC_PASS = "Taller2025"; 
 
@@ -79,7 +79,7 @@ const Badge = ({ status }) => {
 };
 
 // --- APP PRINCIPAL ---
-export default function TurnosBikesApp() {
+export default function App() {
   const [user, setUser] = useState(null);
   const [appUser, setAppUser] = useState(null);
   const [appointments, setAppointments] = useState([]);
@@ -92,19 +92,29 @@ export default function TurnosBikesApp() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Config
-  const [shopConfig, setShopConfig] = useState({ workDays: [1, 3, 5], shopName: 'Turnos Bikes', shopAddress: 'Calle Falsa 123', shopPhone: '11 2233 4455', maxPerDay: 4, logoUrl: '', lastOrderNumber: 1000 });
+  const [shopConfig, setShopConfig] = useState({ 
+    workDays: [1, 3, 5], 
+    shopName: 'Turnos Bikes', 
+    shopAddress: 'Calle Falsa 123', 
+    shopPhone: '11 2233 4455', 
+    maxPerDay: 4, 
+    logoUrl: '', 
+    lastOrderNumber: 1000,
+    blockedDates: [] // ["2023-12-25", "2024-01-01"]
+  });
   const [configSuccess, setConfigSuccess] = useState(false);
+  const [dateToBlock, setDateToBlock] = useState('');
 
   // Nav & Auth
   const [view, setView] = useState('login'); 
   const [subView, setSubView] = useState('dashboard'); 
-  const [dashboardMode, setDashboardMode] = useState('list'); // 'list' o 'board'
+  const [dashboardMode, setDashboardMode] = useState('list');
   const [isStaffLogin, setIsStaffLogin] = useState(false);
   const [loginStep, setLoginStep] = useState(1);
   const [loginDni, setLoginDni] = useState('');
   const [loginPassword, setLoginPassword] = useState(''); 
   const [loginError, setLoginError] = useState('');
-  const [loginForm, setLoginForm] = useState({ name: '', phone: '', bikeModel: '' });
+  const [loginForm, setLoginForm] = useState({ name: '', phone: '', bikeModel: '', email: '' });
   const [showPassword, setShowPassword] = useState(false);
   
   // Force Change Password
@@ -125,7 +135,7 @@ export default function TurnosBikesApp() {
   const [editingClient, setEditingClient] = useState(null); 
   const [receptionModal, setReceptionModal] = useState(null); 
   const [confirmModal, setConfirmModal] = useState(null);
-  const [rescheduleModal, setRescheduleModal] = useState(null); // Para cliente y admin
+  const [rescheduleModal, setRescheduleModal] = useState(null);
 
   // Filters & Stats
   const [searchTerm, setSearchTerm] = useState('');
@@ -139,19 +149,7 @@ export default function TurnosBikesApp() {
   const [newMechPassword, setNewMechPassword] = useState(GENERIC_PASS);
   const [newMechIsAdmin, setNewMechIsAdmin] = useState(false);
 
-  // --- HOTFIX: Inyectar Tailwind CSS CDN ---
-  useEffect(() => {
-    const scriptId = 'tailwind-cdn-style';
-    if (!document.getElementById(scriptId)) {
-        const script = document.createElement('script');
-        script.id = scriptId;
-        script.src = "https://cdn.tailwindcss.com";
-        script.async = true;
-        document.head.appendChild(script);
-    }
-  }, []);
-
-  // Init
+  // Init Auth
   useEffect(() => {
     let isMounted = true;
     const initAuth = async () => {
@@ -172,35 +170,29 @@ export default function TurnosBikesApp() {
       }
     };
     
-    if (auth) {
-        initAuth();
-        const unsubscribe = onAuthStateChanged(auth, (u) => {
-          if (!isMounted) return;
-          setUser(u);
-          if (u) {
-            const savedUser = localStorage.getItem('bikes_app_user_v8');
-            if (savedUser) {
-              const parsed = JSON.parse(savedUser);
-              if (parsed && parsed.dni) {
-                setAppUser(parsed);
-                setView(parsed.role === 'mechanic' ? 'mechanic-dashboard' : 'client-dashboard');
-                if (parsed.role === 'client') setClientBikeModel(parsed.bikeModel || '');
-              }
-            }
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      if (!isMounted) return;
+      setUser(u);
+      if (u) {
+        const savedUser = localStorage.getItem('bikes_app_user_v8');
+        if (savedUser) {
+          const parsed = JSON.parse(savedUser);
+          if (parsed && parsed.dni) {
+            setAppUser(parsed);
+            setView(parsed.role === 'mechanic' ? 'mechanic-dashboard' : 'client-dashboard');
+            if (parsed.role === 'client') setClientBikeModel(parsed.bikeModel || '');
           }
-          setLoading(false);
-        }, (err) => {
-            console.error("Auth Listener Error", err);
-            if (isMounted) {
-                 setAuthError("Error de sesión: " + err.message);
-                 setLoading(false);
-            }
-        });
-        return () => { isMounted = false; unsubscribe(); };
-    } else {
-        setAuthError("Firebase no se inicializó correctamente.");
-        setLoading(false);
-    }
+        }
+      }
+      setLoading(false);
+    }, (err) => {
+        if (isMounted) {
+              setAuthError("Error de sesión: " + err.message);
+              setLoading(false);
+        }
+    });
+    return () => { isMounted = false; unsubscribe(); };
   }, []);
 
   // Data Sync
@@ -221,11 +213,29 @@ export default function TurnosBikesApp() {
       setView('login');
   };
 
-  const saveConfig = async () => {
+  const saveConfig = async (newConfig = null) => {
+      const configToSave = newConfig || shopConfig;
       try {
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), shopConfig, { merge: true });
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'main'), configToSave, { merge: true });
           setConfigSuccess(true); setTimeout(() => setConfigSuccess(false), 3000); 
       } catch (e) { alert("Error al guardar: " + e.message); }
+  };
+
+  const handleBlockDate = () => {
+    if(!dateToBlock) return;
+    const currentBlocked = shopConfig.blockedDates || [];
+    if(!currentBlocked.includes(dateToBlock)){
+        const updated = {...shopConfig, blockedDates: [...currentBlocked, dateToBlock].sort()};
+        setShopConfig(updated);
+        saveConfig(updated);
+    }
+    setDateToBlock('');
+  };
+
+  const handleUnblockDate = (dateToRemove) => {
+      const updated = {...shopConfig, blockedDates: (shopConfig.blockedDates || []).filter(d => d !== dateToRemove)};
+      setShopConfig(updated);
+      saveConfig(updated);
   };
 
   const handleLogoUpload = (e) => {
@@ -256,7 +266,6 @@ export default function TurnosBikesApp() {
     
     setIsSubmitting(true);
     
-    // VERIFICACIÓN SERVER-SIDE SIMULADA
     try {
         const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'turnos'), where('clientId', '==', user.uid), where('status', 'in', ['pendiente', 'recibido', 'en-proceso']));
         const snap = await getDocs(q);
@@ -367,12 +376,24 @@ export default function TurnosBikesApp() {
       e.preventDefault();
       const { id, ...curr } = receptionModal.appt;
       const updates = { bikeModel: receptionModal.bikeModel, serviceType: receptionModal.serviceType, notes: receptionModal.notes };
+      
+      // 1. Actualizar DB
       await updateStatus(id, 'recibido', updates);
+      
+      // 2. Imprimir Orden con Troquel
       printServiceOrder({ ...curr, ...updates, id, orderId: receptionModal.appt.orderId, receivedBy: appUser.name });
+      
+      // 3. WhatsApp Automático
+      // Construir mensaje de recepción
+      const msg = `Hola ${receptionModal.appt.clientName}! 👋\n\nTu bici *${receptionModal.bikeModel}* ingresó al taller *${shopConfig.shopName}*.\n\n📋 Orden: #${receptionModal.appt.orderId}\n🔧 Servicio: ${receptionModal.serviceType}\n\nTe avisaremos cuando esté lista!`;
+      const url = `https://wa.me/${receptionModal.appt.clientPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`;
+      
+      // Abrir WhatsApp en nueva pestaña
+      window.open(url, '_blank');
+      
       setReceptionModal(null);
   };
 
-  // --- CORRECCIÓN: Usar modal en lugar de window.confirm para evitar bloqueos ---
   const handleDeleteAppointment = (id) => {
       setConfirmModal({
           title: 'Eliminar Turno',
@@ -386,7 +407,6 @@ export default function TurnosBikesApp() {
       });
   };
 
-  // --- CORRECCIÓN: Usar modal en lugar de alert para feedback ---
   const openRescheduleModal = (appt, mode) => {
       if (mode === 'client') {
           const apptDate = new Date(appt.date);
@@ -396,7 +416,7 @@ export default function TurnosBikesApp() {
               setConfirmModal({
                   title: 'No se puede reprogramar',
                   msg: 'Solo se permiten cambios con 48hs de anticipación. Por favor, contacta al taller.',
-                  action: () => setConfirmModal(null) // Cierra el modal, no hace nada más
+                  action: () => setConfirmModal(null)
               });
               return;
           }
@@ -447,12 +467,95 @@ export default function TurnosBikesApp() {
       } catch (err) { console.error(err); alert("Error al actualizar cliente."); }
   };
 
+  // --- FUNCIÓN DE IMPRESIÓN MEJORADA (CON TROQUEL) ---
   const printServiceOrder = (appt) => {
-    const logoHtml = shopConfig.logoUrl ? `<img src="${shopConfig.logoUrl}" style="max-height:80px;display:block;margin:0 auto 10px"/>` : '';
-    const win = window.open('','','width=800,height=800');
-    const receivedLine = appt.receivedBy ? `<div class="row"><span>Recibido por:</span><span>${appt.receivedBy}</span></div>` : '';
-    win.document.write(`<html><head><title>Orden #${appt.orderId}</title><style>body{font-family:monospace;padding:20px;max-width:600px;margin:0 auto;border:1px solid #ccc}.header{text-align:center;border-bottom:2px dashed #000;padding-bottom:15px;margin-bottom:20px}.row{display:flex;justify-content:space-between;margin-bottom:8px}.title{font-weight:bold;font-size:1.2em;margin-top:20px}.footer{margin-top:40px;text-align:center;font-size:0.8em;border-top:1px solid #000;padding-top:10px}</style></head><body><div class="header">${logoHtml}<h1>${shopConfig.shopName}</h1><p>${shopConfig.shopAddress} - Tel: ${shopConfig.shopPhone}</p><h2>ORDEN #${appt.orderId || appt.id.slice(0,6).toUpperCase()}</h2></div><div class="title">CLIENTE</div><div class="row"><span>Nombre:</span><strong>${appt.clientName}</strong></div><div class="row"><span>DNI:</span><span>${appt.clientDni}</span></div><div class="row"><span>Tel:</span><span>${appt.clientPhone}</span></div><div class="title">SERVICIO</div><div class="row"><span>Modelo:</span><strong>${appt.bikeModel}</strong></div><div class="row"><span>Servicio:</span><span>${appt.serviceType}</span></div><div class="row"><span>Notas:</span><span>${appt.notes||'-'}</span></div>${receivedLine}<div class="footer"><p>Acepto términos y condiciones.</p><br/><div style="display:flex;justify-content:space-between;margin-top:30px"><span>Firma Cliente</span><span>Firma Taller</span></div></div></body></html>`);
-    win.document.close(); win.print();
+    const logoHtml = shopConfig.logoUrl ? `<img src="${shopConfig.logoUrl}" style="max-height:60px;display:block;margin:0 auto 10px"/>` : '';
+    const now = new Date().toLocaleDateString();
+    const time = new Date().toLocaleTimeString();
+    
+    const win = window.open('','','width=800,height=900');
+    
+    const styles = `
+      body { font-family: 'Courier New', monospace; padding: 20px; max-width: 80mm; margin: 0 auto; }
+      .container { border: 1px solid #000; padding: 10px; margin-bottom: 20px; }
+      .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+      .row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; }
+      .title { font-weight: bold; font-size: 14px; margin: 15px 0 5px 0; border-bottom: 1px dashed #999; }
+      .big-id { text-align: center; font-size: 24px; font-weight: bold; margin: 10px 0; border: 2px solid #000; padding: 5px; }
+      .cut-line { border-top: 2px dashed #000; margin: 30px 0; position: relative; text-align: center; }
+      .cut-line:after { content: '✂ CORTAR AQUÍ - COPIA CLIENTE'; position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #fff; padding: 0 10px; font-size: 10px; }
+      .footer { text-align: center; font-size: 10px; margin-top: 20px; }
+      .disclaimer { font-size: 9px; text-align: justify; margin-top: 10px; }
+      @media print { body { width: 100%; max-width: none; } }
+    `;
+
+    const content = `
+      <html><head><title>Orden #${appt.orderId}</title><style>${styles}</style></head>
+      <body>
+        <!-- COPIA TALLER -->
+        <div class="container">
+            <div class="header">
+                ${logoHtml}
+                <h2 style="margin:0">${shopConfig.shopName}</h2>
+                <div style="font-size:10px">${shopConfig.shopAddress}</div>
+            </div>
+            
+            <div class="big-id">ORDEN #${appt.orderId}</div>
+            
+            <div class="title">DATOS CLIENTE</div>
+            <div class="row"><span>Cliente:</span><strong>${appt.clientName}</strong></div>
+            <div class="row"><span>DNI:</span><span>${appt.clientDni}</span></div>
+            <div class="row"><span>Teléfono:</span><span>${appt.clientPhone}</span></div>
+            
+            <div class="title">DETALLE SERVICIO</div>
+            <div class="row"><span>Modelo Bici:</span><strong>${appt.bikeModel}</strong></div>
+            <div class="row"><span>Servicio:</span><span>${appt.serviceType}</span></div>
+            <div class="row"><span>Ingreso:</span><span>${now} ${time}</span></div>
+            <div class="row"><span>Recibió:</span><span>${appt.receivedBy || 'Staff'}</span></div>
+            
+            <div class="title">NOTAS / ESTADO</div>
+            <p style="font-size:11px; margin:0">${appt.notes || 'Sin observaciones.'}</p>
+            
+            <div class="disclaimer">
+               AUTORIZO LA REPARACIÓN ARRIBA DETALLADA. EL TALLER NO SE RESPONSABILIZA POR EFECTOS PERSONALES DEJADOS EN LA BICICLETA. PASADOS 30 DÍAS SE COBRARÁ ESTADÍA.
+            </div>
+            <br/><br/>
+            <div class="row" style="margin-top:20px"><span>________________</span><span>________________</span></div>
+            <div class="row"><span>Firma Cliente</span><span>Firma Taller</span></div>
+        </div>
+
+        <!-- LINEA DE CORTE -->
+        <div class="cut-line"></div>
+
+        <!-- COPIA CLIENTE (TALÓN) -->
+        <div class="container" style="border-style: dashed;">
+            <div class="header" style="border:none; padding-bottom:0">
+                <h3 style="margin:0">${shopConfig.shopName}</h3>
+                <div style="font-size:11px">Comprobante de Recepción</div>
+            </div>
+            
+            <div class="big-id" style="font-size:18px">#${appt.orderId}</div>
+            
+            <div class="row"><span>Fecha:</span><span>${now}</span></div>
+            <div class="row"><span>Recibimos:</span><strong>${appt.bikeModel}</strong></div>
+            <div class="row"><span>Atendido por:</span><span>${appt.receivedBy || 'Staff'}</span></div>
+            <br/>
+            <div style="text-align:center; font-weight:bold; font-size:12px">
+                CONTACTO TALLER
+            </div>
+            <div class="row" style="justify-content:center"><span>📞 ${shopConfig.shopPhone}</span></div>
+            <div class="row" style="justify-content:center"><span>📍 ${shopConfig.shopAddress}</span></div>
+            <div class="footer">Conserve este talón para retirar.</div>
+        </div>
+      </body></html>
+    `;
+    
+    win.document.write(content);
+    win.document.close();
+    // Esperar un momento para cargar imágenes si las hay
+    setTimeout(() => {
+        win.print();
+    }, 500);
   };
 
   const getFilteredAppointments = () => {
@@ -486,17 +589,44 @@ export default function TurnosBikesApp() {
     const dates = []; let d = new Date(); d.setDate(d.getDate()+1);
     let loops = 0;
     while (dates.length < 6 && loops < 60) { 
-        if(shopConfig.workDays.includes(d.getDay())) dates.push(new Date(d)); 
+        const dateStr = formatDateForQuery(d);
+        // Verificar feriados
+        const isBlocked = shopConfig.blockedDates && shopConfig.blockedDates.includes(dateStr);
+        // Verificar días laborables
+        if(shopConfig.workDays.includes(d.getDay())) {
+             // Solo agregar si NO está bloqueado, o agregar marcado como bloqueado (preferimos mostrarlo bloqueado para feedback)
+             dates.push({ date: new Date(d), isBlocked, dateStr }); 
+        }
         d.setDate(d.getDate()+1); loops++;
     }
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-        {dates.map((d,i) => {
-            const ds = formatDateForQuery(d);
+        {dates.map((item,i) => {
+            const { date: d, isBlocked, dateStr: ds } = item;
             const count = appointments.filter(a=>a.dateString===ds && a.status!=='cancelado').length;
             const full = count >= shopConfig.maxPerDay;
             const sel = currentSelected && formatDateForQuery(currentSelected) === ds;
-            return <button key={i} onClick={()=>!full && onSelect(d)} disabled={full} className={`p-3 rounded-xl border text-left transition-all ${full?'bg-slate-800/50 border-slate-700 opacity-50 cursor-not-allowed':sel?'bg-orange-600 border-orange-500 ring-2 ring-orange-500/30 shadow-lg':'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}><div className="flex justify-between items-start mb-1"><span className={`text-sm font-bold ${full?'text-slate-500':'text-white'}`}>{formatDisplayDate(d).dayName}</span>{full?<XCircle size={14} className="text-red-500"/>:<CheckCircle size={14} className="text-emerald-500"/>}</div><div className="text-xs text-slate-300">{formatDisplayDate(d).date}</div><div className={`mt-2 text-xs font-semibold ${full?'text-red-400':'text-emerald-400'}`}>{full?'Agotado':`${shopConfig.maxPerDay-count} libres`}</div></button>
+            
+            let statusText = `${shopConfig.maxPerDay-count} libres`;
+            let statusColor = 'text-emerald-400';
+            if (isBlocked) { statusText = 'Cerrado'; statusColor = 'text-red-400'; }
+            else if (full) { statusText = 'Agotado'; statusColor = 'text-red-400'; }
+
+            return (
+                <button key={i} onClick={()=>!full && !isBlocked && onSelect(d)} disabled={full || isBlocked} 
+                    className={`p-3 rounded-xl border text-left transition-all relative overflow-hidden
+                        ${(full || isBlocked) ? 'bg-slate-800/50 border-slate-700 opacity-60 cursor-not-allowed' : sel ? 'bg-orange-600 border-orange-500 ring-2 ring-orange-500/30 shadow-lg' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}
+                    `}
+                >
+                    {isBlocked && <div className="absolute inset-0 bg-red-500/10 flex items-center justify-center -rotate-12 pointer-events-none"><span className="text-red-500/50 font-bold border-2 border-red-500/50 px-2 py-1 rounded text-xs uppercase">No Laborable</span></div>}
+                    <div className="flex justify-between items-start mb-1">
+                        <span className={`text-sm font-bold ${(full||isBlocked)?'text-slate-500':'text-white'}`}>{formatDisplayDate(d).dayName}</span>
+                        {(full||isBlocked) ? <XCircle size={14} className="text-red-500"/> : <CheckCircle size={14} className="text-emerald-500"/>}
+                    </div>
+                    <div className="text-xs text-slate-300">{formatDisplayDate(d).date}</div>
+                    <div className={`mt-2 text-xs font-semibold ${statusColor}`}>{statusText}</div>
+                </button>
+            )
         })}
       </div>
     );
@@ -505,7 +635,7 @@ export default function TurnosBikesApp() {
   const sendWhatsApp = (phone, name, bike, status) => {
     if (!phone) { alert("Sin teléfono."); return; }
     let msg = `Hola ${name}, mensaje de ${shopConfig.shopName} sobre tu ${bike}.`;
-    if (status === 'listo') msg = `Hola ${name}, tu ${bike} está lista para retirar en ${shopConfig.shopName}.`;
+    if (status === 'listo') msg = `Hola ${name}! 👋 Tu *${bike}* ya está lista para retirar en ${shopConfig.shopName}. 🚲\nHorarios: Lun a Vie 9-18hs.`;
     window.open(`https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
@@ -558,6 +688,8 @@ export default function TurnosBikesApp() {
                 <input value={loginForm.name} onChange={e=>setLoginForm({...loginForm,name:e.target.value})} required className="w-full bg-slate-900/50 border-slate-700 border rounded-xl p-3.5 text-white focus:ring-2 focus:ring-orange-500 outline-none transition-all" placeholder="Tu Nombre Completo" />
                 <input value={loginForm.phone} onChange={e=>setLoginForm({...loginForm,phone:e.target.value})} className="w-full bg-slate-900/50 border-slate-700 border rounded-xl p-3.5 text-white focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Celular / WhatsApp" />
                 <input value={loginForm.bikeModel} onChange={e=>setLoginForm({...loginForm,bikeModel:e.target.value})} className="w-full bg-slate-900/50 border-slate-700 border rounded-xl p-3.5 text-white focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Modelo de tu Bici (Opcional)" />
+                {/* EMAIL OPCIONAL RECOMENDADO */}
+                <input value={loginForm.email} onChange={e=>setLoginForm({...loginForm,email:e.target.value})} type="email" className="w-full bg-slate-900/50 border-slate-700 border rounded-xl p-3.5 text-white focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Email (Opcional)" />
                 <Button type="submit" className="w-full py-3.5 mt-2">Registrarme</Button>
             </form>
         )}
@@ -576,7 +708,7 @@ export default function TurnosBikesApp() {
         {/* Modal Reprogramar */}
         {rescheduleModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-lg relative bg-slate-900 border-slate-700 shadow-2xl"><button onClick={()=>setRescheduleModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle/></button><h3 className="text-xl font-bold text-white mb-4">Reprogramar Turno</h3><div className="mb-4">{renderDateSelector((d)=>setRescheduleModal({...rescheduleModal, date: d}), rescheduleModal.date)}</div>{rescheduleModal.date && <div className="grid grid-cols-2 gap-4 mb-4"><button onClick={()=>setRescheduleModal({...rescheduleModal, timeBlock:'morning'})} className={`p-3 rounded-xl border text-center ${rescheduleModal.timeBlock==='morning'?'bg-orange-600 text-white border-orange-500':'bg-slate-800 text-slate-400 border-slate-700'}`}>Mañana</button><button onClick={()=>setRescheduleModal({...rescheduleModal, timeBlock:'afternoon'})} className={`p-3 rounded-xl border text-center ${rescheduleModal.timeBlock==='afternoon'?'bg-orange-600 text-white border-orange-500':'bg-slate-800 text-slate-400 border-slate-700'}`}>Tarde</button></div>}<Button onClick={handleRescheduleSubmit} className="w-full">Confirmar Cambio</Button></Card></div>}
         
-        {/* --- CORRECCIÓN: Renderizar confirmModal también en vista cliente --- */}
+        {/* Confirm Modal */}
         {confirmModal && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-sm border-red-500/30 bg-slate-900 shadow-2xl"><div className="flex justify-center mb-4 text-red-500"><AlertCircle size={48} /></div><h3 className="text-xl font-bold text-white mb-2 text-center">{confirmModal.title}</h3><p className="text-slate-400 mb-6 text-center text-sm">{confirmModal.msg}</p><div className="flex gap-3"><Button variant={confirmModal.title.includes("No")?"secondary":"secondary"} onClick={()=>setConfirmModal(null)} className="flex-1 py-3">{confirmModal.title.includes("No")?"Entendido":"Cancelar"}</Button>{!confirmModal.title.includes("No") && <Button variant="danger" onClick={()=>{confirmModal.action();}} className="flex-1 py-3">Confirmar</Button>}</div></Card></div>}
     </main></div>
   );
@@ -682,7 +814,43 @@ export default function TurnosBikesApp() {
 
         {subView === 'mechanics-mgmt' && appUser.isAdmin && <div className="max-w-3xl mx-auto"><Card className="mb-8 border-blue-500/30 shadow-blue-900/10"><div className="flex items-center gap-3 mb-6"><div className="bg-blue-500/20 p-3 rounded-full"><Shield size={24} className="text-blue-400"/></div><h3 className="text-2xl font-bold text-white">Gestión de Staff</h3></div><form onSubmit={addMechanic} className="grid grid-cols-1 md:grid-cols-3 gap-5 bg-slate-900/50 p-5 rounded-2xl border border-slate-800 mb-4"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</label><input required value={newMechName} onChange={e=>setNewMechName(e.target.value)} className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" placeholder="Nombre"/></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">DNI (Usuario)</label><input required value={newMechDni} onChange={e=>setNewMechDni(e.target.value)} type="number" className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" placeholder="DNI"/></div><div className="space-y-1 relative"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contraseña</label><input required value={newMechPassword} onChange={e=>setNewMechPassword(e.target.value)} type="text" className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" /><div className="absolute top-8 right-3 text-xs text-slate-600 select-none">Default</div></div><div className="md:col-span-3 flex items-center justify-between pt-2"><div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800"><input type="checkbox" checked={newMechIsAdmin} onChange={e=>setNewMechIsAdmin(e.target.checked)} className="rounded border-slate-700 bg-slate-800 text-blue-600 w-4 h-4"/><label className="text-sm text-slate-300 font-medium">¿Permisos de Admin?</label></div><Button type="submit" variant="admin" className="px-8"><Plus size={18}/> Crear Usuario</Button></div></form></Card><div className="space-y-3">{mechanics.map(m=><div key={m.id} className="flex justify-between items-center bg-slate-800/80 backdrop-blur-sm p-4 rounded-xl border border-slate-700 hover:border-slate-600 transition"><div className="flex items-center gap-4"><div className={`p-3 rounded-full ${m.isAdmin?'bg-blue-500/20 text-blue-400':'bg-slate-700 text-slate-400'}`}>{m.isAdmin?<Shield size={20}/>:<Wrench size={20}/>}</div><div><p className="text-white font-bold flex items-center gap-2 text-lg">{m.name}{m.isAdmin && <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30 uppercase tracking-wider font-bold">Admin</span>}</p><p className="text-sm text-slate-500 font-mono">DNI: {m.dni}</p></div></div><div className="flex gap-2"><Button variant="secondary" className="p-2.5 h-auto rounded-lg bg-slate-900 border-slate-800 hover:bg-slate-800" onClick={()=>triggerResetPassword(m.id, m.name)} title={`Resetear a ${GENERIC_PASS}`}><RotateCcw size={16}/></Button><Button variant="danger" className="p-2.5 h-auto rounded-lg" onClick={()=>triggerRemoveMechanic(m.id, m.name)}><Trash2 size={16}/></Button></div></div>)}</div></div>}
         
-        {subView === 'config' && <div className="max-w-2xl mx-auto"><Card><div className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4"><h3 className="text-xl font-bold text-white flex items-center gap-2"><Settings size={24} className="text-slate-400"/> Configuración del Taller</h3>{configSuccess && <span className="text-emerald-400 text-sm font-bold animate-in fade-in bg-emerald-900/20 px-3 py-1 rounded-full border border-emerald-500/20">¡Cambios Guardados!</span>}</div><div className="space-y-8"><div><label className="block text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider">Días Laborables</label><div className="flex gap-2 flex-wrap">{['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((day,idx)=><button key={idx} onClick={()=>{const n=shopConfig.workDays.includes(idx)?shopConfig.workDays.filter(d=>d!==idx):[...shopConfig.workDays,idx];setShopConfig({...shopConfig,workDays:n})}} className={`w-12 h-12 rounded-xl text-sm font-bold transition-all ${shopConfig.workDays.includes(idx)?'bg-orange-600 text-white shadow-lg shadow-orange-900/30 scale-110':'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}>{day.slice(0,3)}</button>)}</div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nombre del Taller</label><input value={shopConfig.shopName} onChange={e=>setShopConfig({...shopConfig,shopName:e.target.value})} className="w-full bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Teléfono</label><input value={shopConfig.shopPhone} onChange={e=>setShopConfig({...shopConfig,shopPhone:e.target.value})} className="w-full bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Dirección</label><input value={shopConfig.shopAddress} onChange={e=>setShopConfig({...shopConfig,shopAddress:e.target.value})} className="w-full bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Logo del Taller</label><div className="flex items-center gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">{shopConfig.logoUrl && <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-700 bg-black"><img src={shopConfig.logoUrl} className="w-full h-full object-cover"/><button onClick={()=>setShopConfig({...shopConfig, logoUrl: ''})} className="absolute top-0 right-0 bg-red-600 text-white p-1 rounded-bl hover:bg-red-700 transition"><Trash2 size={12}/></button></div>}<div className="flex-1"><label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-2 border border-slate-700"><Upload size={16}/> Subir Imagen <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload}/></label><p className="text-xs text-slate-500 mt-2">Recomendado: 200x200px. Máx 500KB.</p></div></div></div><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Límite de Turnos por Día</label><div className="flex items-center gap-4"><input type="number" value={shopConfig.maxPerDay} onChange={e=>setShopConfig({...shopConfig,maxPerDay:parseInt(e.target.value)})} className="w-24 bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition text-center font-bold text-lg" /><span className="text-slate-500 text-sm">turnos permitidos por jornada.</span></div></div></div><Button onClick={saveConfig} className="w-full py-4 text-lg mt-4 shadow-blue-900/30">Guardar Cambios</Button></div></Card></div>}
+        {subView === 'config' && <div className="max-w-2xl mx-auto space-y-8">
+            <Card>
+                <div className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4"><h3 className="text-xl font-bold text-white flex items-center gap-2"><Settings size={24} className="text-slate-400"/> Configuración del Taller</h3>{configSuccess && <span className="text-emerald-400 text-sm font-bold animate-in fade-in bg-emerald-900/20 px-3 py-1 rounded-full border border-emerald-500/20">¡Cambios Guardados!</span>}</div>
+                <div className="space-y-8">
+                    <div>
+                        <label className="block text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider">Días Laborables</label>
+                        <div className="flex gap-2 flex-wrap">{['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((day,idx)=><button key={idx} onClick={()=>{const n=shopConfig.workDays.includes(idx)?shopConfig.workDays.filter(d=>d!==idx):[...shopConfig.workDays,idx];setShopConfig({...shopConfig,workDays:n})}} className={`w-12 h-12 rounded-xl text-sm font-bold transition-all ${shopConfig.workDays.includes(idx)?'bg-orange-600 text-white shadow-lg shadow-orange-900/30 scale-110':'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}>{day.slice(0,3)}</button>)}</div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nombre del Taller</label><input value={shopConfig.shopName} onChange={e=>setShopConfig({...shopConfig,shopName:e.target.value})} className="w-full bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Teléfono</label><input value={shopConfig.shopPhone} onChange={e=>setShopConfig({...shopConfig,shopPhone:e.target.value})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Dirección</label><input value={shopConfig.shopAddress} onChange={e=>setShopConfig({...shopConfig,shopAddress:e.target.value})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Logo del Taller</label><div className="flex items-center gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">{shopConfig.logoUrl && <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-700 bg-black"><img src={shopConfig.logoUrl} className="w-full h-full object-cover"/><button onClick={()=>setShopConfig({...shopConfig, logoUrl: ''})} className="absolute top-0 right-0 bg-red-600 text-white p-1 rounded-bl hover:bg-red-700 transition"><Trash2 size={12}/></button></div>}<div className="flex-1"><label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-2 border border-slate-700"><Upload size={16}/> Subir Imagen <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload}/></label><p className="text-xs text-slate-500 mt-2">Recomendado: 200x200px. Máx 500KB.</p></div></div></div><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Límite de Turnos por Día</label><div className="flex items-center gap-4"><input type="number" value={shopConfig.maxPerDay} onChange={e=>setShopConfig({...shopConfig,maxPerDay:parseInt(e.target.value)})} className="w-24 bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition text-center font-bold text-lg" /><span className="text-slate-500 text-sm">turnos permitidos por jornada.</span></div></div></div>
+                    <Button onClick={()=>saveConfig()} className="w-full py-4 text-lg mt-4 shadow-blue-900/30">Guardar Cambios</Button>
+                </div>
+            </Card>
+
+            <Card>
+                <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-white flex items-center gap-2"><CalendarX size={24} className="text-red-400"/> Gestión de Calendario</h3></div>
+                <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 mb-6">
+                    <p className="text-sm text-slate-400 mb-4">Bloquea fechas específicas (feriados, vacaciones) para que los clientes no puedan reservar.</p>
+                    <div className="flex gap-4">
+                        <input type="date" value={dateToBlock} onChange={e=>setDateToBlock(e.target.value)} className="bg-slate-950 border border-slate-800 text-white rounded-xl p-3 outline-none focus:border-red-500" />
+                        <Button onClick={handleBlockDate} variant="danger" className="bg-red-500/20 text-red-400 hover:bg-red-500/30 border-red-500/30">Bloquear Fecha</Button>
+                    </div>
+                </div>
+                <div>
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Fechas Bloqueadas Activas</h4>
+                    <div className="flex flex-wrap gap-3">
+                        {(!shopConfig.blockedDates || shopConfig.blockedDates.length === 0) && <p className="text-sm text-slate-600 italic">No hay fechas bloqueadas.</p>}
+                        {(shopConfig.blockedDates || []).map(date => (
+                            <div key={date} className="bg-red-900/20 border border-red-500/30 text-red-300 px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm">
+                                <CalendarX size={14}/>
+                                {new Date(date).toLocaleDateString()}
+                                <button onClick={()=>handleUnblockDate(date)} className="hover:text-white ml-1"><XCircle size={14}/></button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </Card>
+        </div>}
         
         {subView === 'stats' && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="lg:col-span-2 flex justify-end gap-2 mb-2">
