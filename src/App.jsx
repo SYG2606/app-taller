@@ -28,12 +28,11 @@ const appId = "mi-taller-bici";
 
 // --- CONSTANTES ---
 const SERVICE_TYPES = [
-  "Mantenimiento General (Garantía 30 días)",
+  "Mantenimiento General (30 días -> PostVenta)",
   "Mantenimiento General (Particular)",
   "Revisión 7 días (Ajuste)",
   "Armado de Bike",
-  "Cambio de Cámara/Cubierta",
-  "Lavado y Engrase"
+  "Cambio y ajustes de  partes"
 ];
 const GENERIC_PASS = "Taller2025"; 
 
