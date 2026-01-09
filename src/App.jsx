@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, deleteDoc, runTransaction, where, getDocs, setDoc } from 'firebase/firestore';
-import { Calendar, Clock, Wrench, User, LogOut, CheckCircle, XCircle, AlertCircle, Bike, ClipboardList, Plus, Loader2, MessageCircle, Shield, Users, Lock, Sun, Moon, Search, Settings, BarChart3, Printer, FileText, Timer, Store, RotateCcw, Eye, EyeOff, Edit, History, Trash2, Image as ImageIcon, Upload, ArrowRight, Filter, Layout, List, CalendarX, Mail } from 'lucide-react';
+import { Calendar, Clock, Wrench, User, LogOut, CheckCircle, XCircle, AlertCircle, Bike, ClipboardList, Plus, Loader2, MessageCircle, Shield, Users, Lock, Sun, Moon, Search, Settings, BarChart3, Printer, FileText, Timer, Store, RotateCcw, Eye, EyeOff, Edit, History, Trash2, Image as ImageIcon, Upload, ArrowRight, Filter, Layout, List, CalendarX, Mail, FileClock, Save } from 'lucide-react';
 
-// --- CONFIGURACIÓN FIREBASE (ADAPTADA AL ENTORNO) ---
 // --- CONFIGURACIÓN FIREBASE (REAL) ---
 const firebaseConfig = {
   apiKey: "AIzaSyD5BVLXg7XUYm_B6cyv3hRIoYow1W0wWYg",
@@ -35,6 +34,7 @@ const SERVICE_TYPES = [
   "Armado de Bike",
   "Cambio y Ajustes de  Partes"
 ];
+
 const GENERIC_PASS = "Taller2025"; 
 
 // --- HELPERS ---
@@ -101,7 +101,8 @@ export default function App() {
     maxPerDay: 4, 
     logoUrl: '', 
     lastOrderNumber: 1000,
-    blockedDates: [] 
+    blockedDates: [],
+    implementationDate: '' // Nueva config
   });
   const [configSuccess, setConfigSuccess] = useState(false);
   const [dateToBlock, setDateToBlock] = useState('');
@@ -129,11 +130,18 @@ export default function App() {
   const [clientBikeModel, setClientBikeModel] = useState('');
   const [serviceType, setServiceType] = useState(SERVICE_TYPES[0]);
   
-  const [adminFormData, setAdminFormData] = useState({ bikeModel: '', phone: '', date: '', serviceType: SERVICE_TYPES[0] });
+  // New Admin Appt Form State
+  const [adminApptStep, setAdminApptStep] = useState(1); // 1: DNI, 2: Form
+  const [adminDniSearch, setAdminDniSearch] = useState('');
+  const [isNewClient, setIsNewClient] = useState(false);
+  const [adminFormData, setAdminFormData] = useState({ 
+      name: '', bikeModel: '', phone: '', date: '', serviceType: SERVICE_TYPES[0], notes: '' 
+  });
   const [showAdminApptModal, setShowAdminApptModal] = useState(false);
   
   // Modals
   const [editingClient, setEditingClient] = useState(null); 
+  const [clientHistoryModal, setClientHistoryModal] = useState(null); // Nuevo modal historial
   const [receptionModal, setReceptionModal] = useState(null); 
   const [confirmModal, setConfirmModal] = useState(null);
   const [rescheduleModal, setRescheduleModal] = useState(null);
@@ -151,7 +159,6 @@ export default function App() {
   const [newMechIsAdmin, setNewMechIsAdmin] = useState(false);
 
   // --- HOTFIX: Inyectar Tailwind CSS CDN ---
-  // Esto es lo que faltaba para que se vean los colores
   useEffect(() => {
     const scriptId = 'tailwind-cdn-style';
     if (!document.getElementById(scriptId)) {
@@ -309,6 +316,23 @@ export default function App() {
     }
   };
 
+  // --- LOGICA NUEVA PARA ADMIN APPOINTMENT ---
+  const handleAdminDniSearch = async (e) => {
+      e.preventDefault();
+      if(!adminDniSearch) return;
+      
+      const foundClient = clients.find(c => c.dni === adminDniSearch);
+      
+      if (foundClient) {
+          setIsNewClient(false);
+          setAdminFormData(prev => ({ ...prev, name: foundClient.name, phone: foundClient.phone, bikeModel: foundClient.bikeModel || '' }));
+      } else {
+          setIsNewClient(true);
+          setAdminFormData(prev => ({ ...prev, name: '', phone: '', bikeModel: '' }));
+      }
+      setAdminApptStep(2);
+  };
+
   const createAdminAppointment = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -317,14 +341,47 @@ export default function App() {
     
     setIsSubmitting(true);
     try {
+        let finalClientId = 'admin-created';
+        
+        // Si es cliente nuevo, crearlo en la DB
+        if (isNewClient) {
+            const clientDoc = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'clients'), { 
+                dni: adminDniSearch, 
+                name: adminFormData.name, 
+                phone: adminFormData.phone, 
+                bikeModel: adminFormData.bikeModel,
+                createdAt: new Date().toISOString() 
+            });
+            finalClientId = clientDoc.id; // Usamos el ID del doc
+        } else {
+            const existing = clients.find(c => c.dni === adminDniSearch);
+            if (existing) finalClientId = existing.id;
+        }
+
         const d = new Date(adminFormData.date);
         const orderNum = await generateOrderNumber();
+        
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'turnos'), {
-            orderId: orderNum, clientId: 'admin-created', clientName: 'Cliente (Mostrador)', clientDni: 'N/A',
-            clientPhone: adminFormData.phone, bikeModel: adminFormData.bikeModel, serviceType: adminFormData.serviceType,
-            date: d.toISOString(), dateString: formatDateForQuery(d), notes: 'Agendado por Staff', status: 'pendiente', createdBy: 'mechanic', createdAt: new Date().toISOString()
+            orderId: orderNum, 
+            clientId: finalClientId, // Importante para el historial
+            clientName: adminFormData.name, 
+            clientDni: adminDniSearch,
+            clientPhone: adminFormData.phone, 
+            bikeModel: adminFormData.bikeModel, 
+            serviceType: adminFormData.serviceType,
+            date: d.toISOString(), 
+            dateString: formatDateForQuery(d), 
+            notes: adminFormData.notes || 'Agendado por Staff', 
+            status: 'pendiente', 
+            createdBy: 'mechanic', 
+            createdAt: new Date().toISOString()
         });
-        alert(`Turno #${orderNum} creado.`); setShowAdminApptModal(false); setAdminFormData({ bikeModel: '', phone: '', date: '', serviceType: SERVICE_TYPES[0] });
+        
+        alert(`Turno #${orderNum} creado.`); 
+        setShowAdminApptModal(false); 
+        setAdminApptStep(1);
+        setAdminDniSearch('');
+        setAdminFormData({ name: '', bikeModel: '', phone: '', date: '', serviceType: SERVICE_TYPES[0], notes: '' });
     } catch (e) { alert("Error al crear: " + e.message); }
     finally { setIsSubmitting(false); }
   };
@@ -744,7 +801,24 @@ export default function App() {
         {/* REUTILIZAMOS MODAL REPROGRAMACION PARA ADMIN */}
         {rescheduleModal && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-lg relative bg-slate-900 border-slate-700 shadow-2xl"><button onClick={()=>setRescheduleModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle/></button><h3 className="text-xl font-bold text-white mb-4">Reprogramar Turno (Admin)</h3><div className="mb-4">{renderDateSelector((d)=>setRescheduleModal({...rescheduleModal, date: d}), rescheduleModal.date)}</div>{rescheduleModal.date && <div className="grid grid-cols-2 gap-4 mb-4"><button onClick={()=>setRescheduleModal({...rescheduleModal, timeBlock:'morning'})} className={`p-3 rounded-xl border text-center ${rescheduleModal.timeBlock==='morning'?'bg-orange-600 text-white border-orange-500':'bg-slate-800 text-slate-400 border-slate-700'}`}>Mañana</button><button onClick={()=>setRescheduleModal({...rescheduleModal, timeBlock:'afternoon'})} className={`p-3 rounded-xl border text-center ${rescheduleModal.timeBlock==='afternoon'?'bg-orange-600 text-white border-orange-500':'bg-slate-800 text-slate-400 border-slate-700'}`}>Tarde</button></div>}<Button onClick={handleRescheduleSubmit} className="w-full">Confirmar Cambio</Button></Card></div>}
 
-        {showAdminApptModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-lg relative bg-slate-900 border-slate-700 shadow-2xl"><button onClick={()=>setShowAdminApptModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle/></button><h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><Plus className="text-blue-500"/> Nuevo Turno Manual</h3><form onSubmit={createAdminAppointment} className="space-y-5"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bicicleta</label><input value={adminFormData.bikeModel} onChange={e=>setAdminFormData({...adminFormData, bikeModel:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" placeholder="Ej: SLP 29 Pro" /></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Teléfono Cliente</label><input value={adminFormData.phone} onChange={e=>setAdminFormData({...adminFormData, phone:e.target.value})} type="tel" className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" placeholder="WhatsApp" /></div><div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</label><input type="datetime-local" value={adminFormData.date} onChange={e=>setAdminFormData({...adminFormData, date:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white [color-scheme:dark] outline-none focus:border-blue-500 transition" /></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Servicio</label><select value={adminFormData.serviceType} onChange={e=>setAdminFormData({...adminFormData, serviceType:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition">{SERVICE_TYPES.map(s=><option key={s} value={s}>{s}</option>)}</select></div></div><Button type="submit" variant="admin" disabled={isSubmitting} className="w-full py-4 text-lg mt-4">{isSubmitting?'Guardando...':'Guardar Turno'}</Button></form></Card></div>}
+        {/* MODAL NUEVO TURNO ADMIN (INTELIGENTE) */}
+        {showAdminApptModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-lg relative bg-slate-900 border-slate-700 shadow-2xl"><button onClick={()=>setShowAdminApptModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle/></button>
+            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><Plus className="text-blue-500"/> Nuevo Turno Manual</h3>
+            {adminApptStep === 1 ? (
+                <form onSubmit={handleAdminDniSearch} className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ingrese DNI Cliente</label><div className="flex gap-2"><input autoFocus value={adminDniSearch} onChange={e=>setAdminDniSearch(e.target.value)} type="number" className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition text-lg tracking-wider" placeholder="Ej: 30123456" /><Button type="submit" variant="admin"><Search size={20}/></Button></div><p className="text-xs text-slate-500 mt-2">Buscará si el cliente existe. Si no, podrás crearlo.</p></div>
+                </form>
+            ) : (
+                <form onSubmit={createAdminAppointment} className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700 flex justify-between items-center mb-4"><div className="flex items-center gap-2"><User size={16} className="text-blue-400"/><span className="text-white font-bold">{adminDniSearch}</span></div>{isNewClient ? <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded border border-orange-500/30">Nuevo Cliente</span> : <span className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30">Cliente Existente</span>}</div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre Completo</label><input required value={adminFormData.name} onChange={e=>setAdminFormData({...adminFormData, name:e.target.value})} className={`w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition ${!isNewClient ? 'opacity-80' : ''}`} placeholder="Nombre y Apellido" /></div>
+                    <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Teléfono</label><input required value={adminFormData.phone} onChange={e=>setAdminFormData({...adminFormData, phone:e.target.value})} type="tel" className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" placeholder="WhatsApp" /></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bicicleta</label><input value={adminFormData.bikeModel} onChange={e=>setAdminFormData({...adminFormData, bikeModel:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" placeholder="Modelo" /></div></div>
+                    <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</label><input type="datetime-local" required value={adminFormData.date} onChange={e=>setAdminFormData({...adminFormData, date:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white [color-scheme:dark] outline-none focus:border-blue-500 transition" /></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Servicio</label><select value={adminFormData.serviceType} onChange={e=>setAdminFormData({...adminFormData, serviceType:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition">{SERVICE_TYPES.map(s=><option key={s} value={s}>{s}</option>)}</select></div></div>
+                    <Button type="submit" variant="admin" disabled={isSubmitting} className="w-full py-4 text-lg mt-4">{isSubmitting ? 'Guardando...' : (isNewClient ? 'Crear Cliente y Turno' : 'Agendar Turno')}</Button>
+                    <button type="button" onClick={()=>setAdminApptStep(1)} className="w-full text-center text-xs text-slate-500 hover:text-white mt-2">Volver atrás</button>
+                </form>
+            )}
+        </Card></div>}
 
         {subView === 'dashboard' && <>
             {receptionModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-lg relative bg-slate-900 border-slate-700 shadow-2xl"><button onClick={()=>setReceptionModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle/></button><h3 className="text-2xl font-bold text-white mb-2">Recepción de Bicicleta</h3><div className="bg-blue-900/20 border border-blue-500/20 p-4 rounded-xl mb-6 flex items-center gap-3"><User className="text-blue-400"/><div className="text-sm"><p className="text-blue-200 font-bold">{receptionModal.appt.clientName}</p><p className="text-blue-400/60">DNI: {receptionModal.appt.clientDni}</p></div></div><form onSubmit={handleReceptionConfirm} className="space-y-5"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Modelo Bici (Verificar)</label><input value={receptionModal.bikeModel} onChange={e=>setReceptionModal({...receptionModal, bikeModel:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition"/></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Servicio a Realizar</label><select value={receptionModal.serviceType} onChange={e=>setReceptionModal({...receptionModal, serviceType:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition">{SERVICE_TYPES.map(s=><option key={s} value={s}>{s}</option>)}</select></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Notas / Diagnóstico Visual</label><textarea value={receptionModal.notes} onChange={e=>setReceptionModal({...receptionModal, notes:e.target.value})} rows="3" className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition resize-none" placeholder="Rayones, estado general..."/></div><Button type="submit" className="w-full py-4 text-lg mt-2">Confirmar e Imprimir Orden</Button></form></Card></div>}
@@ -762,7 +836,7 @@ export default function App() {
             {dashboardMode === 'list' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     <div className="group h-full">
-                        <Card onClick={()=>setShowAdminApptModal(true)} className="h-full border-2 border-dashed border-slate-700 bg-slate-800/30 hover:bg-slate-800/80 hover:border-blue-500/50 flex flex-col justify-center items-center gap-4 transition-all duration-300 group">
+                        <Card onClick={()=>{setAdminApptStep(1); setShowAdminApptModal(true)}} className="h-full border-2 border-dashed border-slate-700 bg-slate-800/30 hover:bg-slate-800/80 hover:border-blue-500/50 flex flex-col justify-center items-center gap-4 transition-all duration-300 group cursor-pointer">
                             <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-600 transition-all duration-300 shadow-xl"><Plus size={40} className="text-slate-600 group-hover:text-white transition-colors"/></div>
                             <div className="text-center"><h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">Nuevo Turno</h3><p className="text-slate-500 text-sm">Agendar Manualmente</p></div>
                         </Card>
@@ -815,15 +889,43 @@ export default function App() {
         {subView === 'clients' && appUser.isAdmin && <div className="space-y-6">
             {editingClient && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-md relative bg-slate-900 border-slate-700 shadow-2xl"><button onClick={()=>setEditingClient(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle/></button><h3 className="text-2xl font-bold text-white mb-6">Editar Cliente</h3><form onSubmit={handleUpdateClient} className="space-y-4"><div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Nombre</label><input value={editingClient.name} onChange={e=>setEditingClient({...editingClient,name:e.target.value})} className="w-full bg-slate-950 text-white rounded-xl p-3 border border-slate-800 focus:border-blue-500 outline-none transition"/></div><div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Teléfono</label><input value={editingClient.phone} onChange={e=>setEditingClient({...editingClient,phone:e.target.value})} className="w-full bg-slate-950 text-white rounded-xl p-3 border border-slate-800 focus:border-blue-500 outline-none transition"/></div><div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Bici (Default)</label><input value={editingClient.bikeModel} onChange={e=>setEditingClient({...editingClient,bikeModel:e.target.value})} className="w-full bg-slate-950 text-white rounded-xl p-3 border border-slate-800 focus:border-blue-500 outline-none transition"/></div><Button type="submit" className="w-full py-3 mt-2">Guardar Cambios</Button></form></Card></div>}
             
+            {/* Modal Historial Cliente */}
+            {clientHistoryModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-4xl relative bg-slate-900 border-slate-700 shadow-2xl max-h-[80vh] overflow-hidden flex flex-col"><button onClick={()=>setClientHistoryModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle/></button>
+                <div className="mb-6 flex items-center gap-4">
+                    <div className="bg-blue-600/20 p-3 rounded-full"><History size={24} className="text-blue-400"/></div>
+                    <div><h3 className="text-2xl font-bold text-white">{clientHistoryModal.name}</h3><p className="text-sm text-slate-400">Historial de Servicios</p></div>
+                </div>
+                <div className="overflow-y-auto flex-1">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-slate-800 text-xs text-slate-400 uppercase tracking-wider sticky top-0"><tr><th className="p-3">Fecha</th><th className="p-3">Orden</th><th className="p-3">Servicio</th><th className="p-3">Bici</th><th className="p-3">Mecánico</th></tr></thead>
+                        <tbody className="divide-y divide-slate-800 text-sm text-slate-300">
+                            {appointments.filter(a => (a.clientId === clientHistoryModal.id || a.clientDni === clientHistoryModal.dni)).sort((a,b)=>new Date(b.date)-new Date(a.date)).map(hist => (
+                                <tr key={hist.id} className="hover:bg-slate-800/50">
+                                    <td className="p-3 font-mono text-xs">{new Date(hist.date).toLocaleDateString()}</td>
+                                    <td className="p-3 font-bold">#{hist.orderId}</td>
+                                    <td className="p-3">{hist.serviceType}</td>
+                                    <td className="p-3 text-slate-400">{hist.bikeModel}</td>
+                                    <td className="p-3 text-slate-500 text-xs">{hist.mechanicName || '-'}</td>
+                                </tr>
+                            ))}
+                            {appointments.filter(a => (a.clientId === clientHistoryModal.id || a.clientDni === clientHistoryModal.dni)).length === 0 && <tr><td colSpan="5" className="p-8 text-center text-slate-500">Sin historial registrado.</td></tr>}
+                        </tbody>
+                    </table>
+                </div>
+            </Card></div>}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{clients.map(client=>{
-                const clientServices=appointments.filter(a=>a.clientDni===client.dni&&a.status==='listo');
+                const clientServices=appointments.filter(a=>(a.clientId===client.id || a.clientDni===client.dni) && a.status==='listo');
                 const lastServiceDate=clientServices.length>0?new Date(Math.max(...clientServices.map(a=>new Date(a.date)))):null;
                 return <Card key={client.id} className="relative group hover:border-slate-600 transition"><div className="flex items-start justify-between mb-4"><div className="flex items-center gap-3"><div className="bg-slate-800 p-3 rounded-full border border-slate-700 shadow-inner"><User size={24} className="text-slate-300"/></div><div><h3 className="font-bold text-white text-lg">{client.name}</h3><p className="text-xs text-slate-500 font-mono bg-slate-900 px-1.5 py-0.5 rounded w-fit">DNI: {client.dni}</p></div></div><button onClick={()=>setEditingClient(client)} className="text-slate-600 hover:text-blue-400 p-2 rounded-lg hover:bg-blue-500/10 transition"><Edit size={18}/></button></div>
                 <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-2 gap-3 text-xs">
                     <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-center"><div className="text-slate-500 mb-1 flex items-center justify-center gap-1 font-bold uppercase tracking-wider"><Wrench size={12}/> Servicios</div><div className="text-xl font-bold text-blue-400">{clientServices.length}</div></div>
                     <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-center"><div className="text-slate-500 mb-1 flex items-center justify-center gap-1 font-bold uppercase tracking-wider"><History size={12}/> Último</div><div className="text-sm font-medium text-slate-300">{lastServiceDate ? lastServiceDate.toLocaleDateString() : '-'}</div></div>
                 </div>
-                <div className="mt-4"><button onClick={()=>sendWhatsApp(client.phone,client.name,client.bikeModel||'bici','consulta')} className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-green-600 hover:text-white text-slate-300 py-3 rounded-xl text-sm font-medium transition-all border border-slate-700 hover:border-green-500 shadow-sm"><MessageCircle size={16}/> Contactar WhatsApp</button></div></Card>;
+                <div className="mt-4 flex gap-2">
+                    <button onClick={()=>sendWhatsApp(client.phone,client.name,client.bikeModel||'bici','consulta')} className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-green-600 hover:text-white text-slate-300 py-3 rounded-xl text-sm font-medium transition-all border border-slate-700 hover:border-green-500 shadow-sm"><MessageCircle size={16}/></button>
+                    <button onClick={()=>setClientHistoryModal(client)} className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 py-3 rounded-xl text-sm font-medium transition-all border border-slate-700 hover:border-blue-500 shadow-sm"><FileClock size={16}/> Historial</button>
+                </div></Card>;
             })}</div></div>}
 
         {subView === 'mechanics-mgmt' && appUser.isAdmin && <div className="max-w-3xl mx-auto"><Card className="mb-8 border-blue-500/30 shadow-blue-900/10"><div className="flex items-center gap-3 mb-6"><div className="bg-blue-500/20 p-3 rounded-full"><Shield size={24} className="text-blue-400"/></div><h3 className="text-2xl font-bold text-white">Gestión de Staff</h3></div><form onSubmit={addMechanic} className="grid grid-cols-1 md:grid-cols-3 gap-5 bg-slate-900/50 p-5 rounded-2xl border border-slate-800 mb-4"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</label><input required value={newMechName} onChange={e=>setNewMechName(e.target.value)} className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" placeholder="Nombre"/></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">DNI (Usuario)</label><input required value={newMechDni} onChange={e=>setNewMechDni(e.target.value)} type="number" className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" placeholder="DNI"/></div><div className="space-y-1 relative"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contraseña</label><input required value={newMechPassword} onChange={e=>setNewMechPassword(e.target.value)} type="text" className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" /><div className="absolute top-8 right-3 text-xs text-slate-600 select-none">Default</div></div><div className="md:col-span-3 flex items-center justify-between pt-2"><div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800"><input type="checkbox" checked={newMechIsAdmin} onChange={e=>setNewMechIsAdmin(e.target.checked)} className="rounded border-slate-700 bg-slate-800 text-blue-600 w-4 h-4"/><label className="text-sm text-slate-300 font-medium">¿Permisos de Admin?</label></div><Button type="submit" variant="admin" className="px-8"><Plus size={18}/> Crear Usuario</Button></div></form></Card><div className="space-y-3">{mechanics.map(m=><div key={m.id} className="flex justify-between items-center bg-slate-800/80 backdrop-blur-sm p-4 rounded-xl border border-slate-700 hover:border-slate-600 transition"><div className="flex items-center gap-4"><div className={`p-3 rounded-full ${m.isAdmin?'bg-blue-500/20 text-blue-400':'bg-slate-700 text-slate-400'}`}>{m.isAdmin?<Shield size={20}/>:<Wrench size={20}/>}</div><div><p className="text-white font-bold flex items-center gap-2 text-lg">{m.name}{m.isAdmin && <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30 uppercase tracking-wider font-bold">Admin</span>}</p><p className="text-sm text-slate-500 font-mono">DNI: {m.dni}</p></div></div><div className="flex gap-2"><Button variant="secondary" className="p-2.5 h-auto rounded-lg bg-slate-900 border-slate-800 hover:bg-slate-800" onClick={()=>triggerResetPassword(m.id, m.name)} title={`Resetear a ${GENERIC_PASS}`}><RotateCcw size={16}/></Button><Button variant="danger" className="p-2.5 h-auto rounded-lg" onClick={()=>triggerRemoveMechanic(m.id, m.name)}><Trash2 size={16}/></Button></div></div>)}</div></div>}
@@ -836,7 +938,8 @@ export default function App() {
                         <label className="block text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider">Días Laborables</label>
                         <div className="flex gap-2 flex-wrap">{['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((day,idx)=><button key={idx} onClick={()=>{const n=shopConfig.workDays.includes(idx)?shopConfig.workDays.filter(d=>d!==idx):[...shopConfig.workDays,idx];setShopConfig({...shopConfig,workDays:n})}} className={`w-12 h-12 rounded-xl text-sm font-bold transition-all ${shopConfig.workDays.includes(idx)?'bg-orange-600 text-white shadow-lg shadow-orange-900/30 scale-110':'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}>{day.slice(0,3)}</button>)}</div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nombre del Taller</label><input value={shopConfig.shopName} onChange={e=>setShopConfig({...shopConfig,shopName:e.target.value})} className="w-full bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Teléfono</label><input value={shopConfig.shopPhone} onChange={e=>setShopConfig({...shopConfig,shopPhone:e.target.value})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Dirección</label><input value={shopConfig.shopAddress} onChange={e=>setShopConfig({...shopConfig,shopAddress:e.target.value})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Logo del Taller</label><div className="flex items-center gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">{shopConfig.logoUrl && <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-700 bg-black"><img src={shopConfig.logoUrl} className="w-full h-full object-cover"/><button onClick={()=>setShopConfig({...shopConfig, logoUrl: ''})} className="absolute top-0 right-0 bg-red-600 text-white p-1 rounded-bl hover:bg-red-700 transition"><Trash2 size={12}/></button></div>}<div className="flex-1"><label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-2 border border-slate-700"><Upload size={16}/> Subir Imagen <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload}/></label><p className="text-xs text-slate-500 mt-2">Recomendado: 200x200px. Máx 500KB.</p></div></div></div><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Límite de Turnos por Día</label><div className="flex items-center gap-4"><input type="number" value={shopConfig.maxPerDay} onChange={e=>setShopConfig({...shopConfig,maxPerDay:parseInt(e.target.value)})} className="w-24 bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition text-center font-bold text-lg" /><span className="text-slate-500 text-sm">turnos permitidos por jornada.</span></div></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nombre del Taller</label><input value={shopConfig.shopName} onChange={e=>setShopConfig({...shopConfig,shopName:e.target.value})} className="w-full bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Teléfono</label><input value={shopConfig.shopPhone} onChange={e=>setShopConfig({...shopConfig,shopPhone:e.target.value})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Dirección</label><input value={shopConfig.shopAddress} onChange={e=>setShopConfig({...shopConfig,shopAddress:e.target.value})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Logo del Taller</label><div className="flex items-center gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">{shopConfig.logoUrl && <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-700 bg-black"><img src={shopConfig.logoUrl} className="w-full h-full object-cover"/><button onClick={()=>setShopConfig({...shopConfig, logoUrl: ''})} className="absolute top-0 right-0 bg-red-600 text-white p-1 rounded-bl hover:bg-red-700 transition"><Trash2 size={12}/></button></div>}<div className="flex-1"><label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-2 border border-slate-700"><Upload size={16}/> Subir Imagen <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload}/></label><p className="text-xs text-slate-500 mt-2">Recomendado: 200x200px. Máx 500KB.</p></div></div></div><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Límite de Turnos por Día</label><div className="flex items-center gap-4"><input type="number" value={shopConfig.maxPerDay} onChange={e=>setShopConfig({...shopConfig,maxPerDay:parseInt(e.target.value)})} className="w-24 bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition text-center font-bold text-lg" /><span className="text-slate-500 text-sm">turnos permitidos por jornada.</span></div></div>
+                    <div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Inicio de Implementación</label><input type="date" value={shopConfig.implementationDate} onChange={e=>setShopConfig({...shopConfig,implementationDate:e.target.value})} className="w-full bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white [color-scheme:dark] outline-none focus:border-blue-500 transition" /></div></div>
                     <Button onClick={()=>saveConfig()} className="w-full py-4 text-lg mt-4 shadow-blue-900/30">Guardar Cambios</Button>
                 </div>
             </Card>
