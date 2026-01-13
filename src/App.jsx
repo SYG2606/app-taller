@@ -179,11 +179,17 @@ export default function App() {
     logoUrl: '', 
     lastOrderNumber: 1000,
     blockedDates: [],
-    implementationDate: '' // Nueva config
+    implementationDate: '', // Nueva config
     industry: 'bikes' // Valor por defecto
   });
+  // Determinar la configuración actual basada en el estado
+const activeIndustry = INDUSTRIES[shopConfig.industry] || INDUSTRIES.bikes;
+// Determinar qué icono usar
+const ItemIcon = IconMap[activeIndustry.icons.item];
+const StaffIcon = IconMap[activeIndustry.icons.staff];
   const [configSuccess, setConfigSuccess] = useState(false);
   const [dateToBlock, setDateToBlock] = useState('');
+const availableServices = shopConfig.customServices || activeIndustry.defaultServices;
 
   // Nav & Auth
   const [view, setView] = useState('login'); 
@@ -245,13 +251,8 @@ const [serviceType, setServiceType] = useState(
   const [newMechPassword, setNewMechPassword] = useState(GENERIC_PASS);
   const [newMechIsAdmin, setNewMechIsAdmin] = useState(false);
 
-  // Determinar la configuración actual basada en el estado
-const activeIndustry = INDUSTRIES[shopConfig.industry] || INDUSTRIES.bikes;
-// Determinar qué icono usar
-const ItemIcon = IconMap[activeIndustry.icons.item];
-const StaffIcon = IconMap[activeIndustry.icons.staff];
+  
 // Determinar servicios (si la config de la DB tiene servicios personalizados, úsalos, sino usa los default)
-const availableServices = shopConfig.customServices || activeIndustry.defaultServices;
   // --- HOTFIX: Inyectar Tailwind CSS CDN ---
   useEffect(() => {
     const scriptId = 'tailwind-cdn-style';
@@ -1032,6 +1033,59 @@ const availableServices = shopConfig.customServices || activeIndustry.defaultSer
         {subView === 'mechanics-mgmt' && appUser.isAdmin && <div className="max-w-3xl mx-auto"><Card className="mb-8 border-blue-500/30 shadow-blue-900/10"><div className="flex items-center gap-3 mb-6"><div className="bg-blue-500/20 p-3 rounded-full"><Shield size={24} className="text-blue-400"/></div><h3 className="text-2xl font-bold text-white">Gestión de Staff</h3></div><form onSubmit={addMechanic} className="grid grid-cols-1 md:grid-cols-3 gap-5 bg-slate-900/50 p-5 rounded-2xl border border-slate-800 mb-4"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</label><input required value={newMechName} onChange={e=>setNewMechName(e.target.value)} className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" placeholder="Nombre"/></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">DNI (Usuario)</label><input required value={newMechDni} onChange={e=>setNewMechDni(e.target.value)} type="number" className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" placeholder="DNI"/></div><div className="space-y-1 relative"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contraseña</label><input required value={newMechPassword} onChange={e=>setNewMechPassword(e.target.value)} type="text" className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" /><div className="absolute top-8 right-3 text-xs text-slate-600 select-none">Default</div></div><div className="md:col-span-3 flex items-center justify-between pt-2"><div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800"><input type="checkbox" checked={newMechIsAdmin} onChange={e=>setNewMechIsAdmin(e.target.checked)} className="rounded border-slate-700 bg-slate-800 text-blue-600 w-4 h-4"/><label className="text-sm text-slate-300 font-medium">¿Permisos de Admin?</label></div><Button type="submit" variant="admin" className="px-8"><Plus size={18}/> Crear Usuario</Button></div></form></Card><div className="space-y-3">{mechanics.map(m=><div key={m.id} className="flex justify-between items-center bg-slate-800/80 backdrop-blur-sm p-4 rounded-xl border border-slate-700 hover:border-slate-600 transition"><div className="flex items-center gap-4"><div className={`p-3 rounded-full ${m.isAdmin?'bg-blue-500/20 text-blue-400':'bg-slate-700 text-slate-400'}`}>{m.isAdmin?<Shield size={20}/>:<Wrench size={20}/>}</div><div><p className="text-white font-bold flex items-center gap-2 text-lg">{m.name}{m.isAdmin && <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30 uppercase tracking-wider font-bold">Admin</span>}</p><p className="text-sm text-slate-500 font-mono">DNI: {m.dni}</p></div></div><div className="flex gap-2"><Button variant="secondary" className="p-2.5 h-auto rounded-lg bg-slate-900 border-slate-800 hover:bg-slate-800" onClick={()=>triggerResetPassword(m.id, m.name)} title={`Resetear a ${GENERIC_PASS}`}><RotateCcw size={16}/></Button><Button variant="danger" className="p-2.5 h-auto rounded-lg" onClick={()=>triggerRemoveMechanic(m.id, m.name)}><Trash2 size={16}/></Button></div></div>)}</div></div>}
         
         {subView === 'config' && <div className="max-w-2xl mx-auto space-y-8">
+
+            {/* --- SELECTOR DE INDUSTRIA (NUEVO) --- */}
+            <Card className="border-blue-500/30 shadow-blue-900/10">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Store size={24} className="text-blue-400"/> 
+                        Rubro del Negocio
+                    </h3>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {Object.entries(INDUSTRIES).map(([key, config]) => {
+                        // Obtenemos el icono dinámicamente
+                        const IndustryIcon = IconMap[config.icons.item] || Store;
+                        const isSelected = shopConfig.industry === key;
+                        
+                        return (
+                            <button
+                                key={key}
+                                onClick={() => {
+                                    // 1. Cambiamos la configuración
+                                    setShopConfig({ ...shopConfig, industry: key });
+                                    // 2. Reseteamos el servicio seleccionado para que no quede uno viejo
+                                    setServiceType(config.defaultServices[0]);
+                                }}
+                                className={`
+                                    relative p-4 rounded-xl border flex flex-col items-center gap-3 transition-all duration-300
+                                    ${isSelected 
+                                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/40 scale-105 z-10' 
+                                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white hover:border-slate-500'
+                                    }
+                                `}
+                            >
+                                {isSelected && (
+                                    <div className="absolute top-2 right-2">
+                                        <CheckCircle size={16} className="text-white"/>
+                                    </div>
+                                )}
+                                <div className={`p-3 rounded-full ${isSelected ? 'bg-white/20' : 'bg-slate-900'}`}>
+                                    <IndustryIcon size={24} />
+                                </div>
+                                <div className="text-center">
+                                    <span className="block font-bold text-sm">{config.label}</span>
+                                    <span className="text-[10px] opacity-70 uppercase tracking-wider">
+                                        {config.staffLabel}
+                                    </span>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            </Card>
+            {/* --- FIN SELECTOR --- */}
+
             <Card>
                 <div className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4"><h3 className="text-xl font-bold text-white flex items-center gap-2"><Settings size={24} className="text-slate-400"/> Configuración del Taller</h3>{configSuccess && <span className="text-emerald-400 text-sm font-bold animate-in fade-in bg-emerald-900/20 px-3 py-1 rounded-full border border-emerald-500/20">¡Cambios Guardados!</span>}</div>
                 <div className="space-y-8">
