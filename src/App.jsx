@@ -2,9 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, deleteDoc, runTransaction, where, getDocs, setDoc } from 'firebase/firestore';
-import { Calendar, Clock, Wrench, User, LogOut, CheckCircle, XCircle, AlertCircle, Bike, ClipboardList, Plus, Loader2, MessageCircle, Shield, Users, Lock, Sun, Moon, Search, Settings, BarChart3, Printer, FileText, Timer, Store, RotateCcw, Eye, EyeOff, Edit, History, Trash2, Image as ImageIcon, Upload, ArrowRight, Filter, Layout, List, CalendarX, Mail, FileClock, Save } from 'lucide-react';
+// SECCIÓN ACTUALIZADA DE ICONOS PARA CUBRIR TODAS LAS INDUSTRIAS
+import { 
+  Calendar, Clock, Wrench, User, LogOut, CheckCircle, XCircle, AlertCircle, 
+  Bike, ClipboardList, Plus, Loader2, MessageCircle, Shield, Users, Lock, 
+  Sun, Moon, Search, Settings, BarChart3, Printer, FileText, Timer, Store, 
+  RotateCcw, Eye, EyeOff, Edit, History, Trash2, Image as ImageIcon, Upload, 
+  ArrowRight, Filter, Layout, List, CalendarX, Mail, FileClock, Save,
+  // Nuevos Iconos Agregados:
+  Smartphone, Cpu, Laptop, // Tech
+  Scissors, Sparkles, Gem, // Belleza
+  Dumbbell, Trophy, Activity, // Deportes
+  Stethoscope, Heart, Pill, // Salud
+  Car, Key, // Automotriz
+  PawPrint, Bone // Mascotas
+} from 'lucide-react';
 
-// --- CONFIGURACIÓN FIREBASE (REAL) ---
+// --- CONFIGURACIÓN FIREBASE (MANTENER IGUAL) ---
 const firebaseConfig = {
   apiKey: "AIzaSyD5BVLXg7XUYm_B6cyv3hRIoYow1W0wWYg",
   authDomain: "turnos-bikes-app-98635.firebaseapp.com",
@@ -24,18 +38,81 @@ try {
   console.error("Error inicializando Firebase:", e);
 }
 
-const appId = "mi-taller-bici";
+const appId = "mi-taller-bici"; // Puedes cambiar esto dinámicamente si escalas a SaaS real
 
-// --- CONSTANTES ---
-const SERVICE_TYPES = [
-  "Mantenimiento General (30 días -> PostCompra)",
-  "Mantenimiento General (Particular)",
-  "Revisión 7 días (Ajuste)",
-  "Armado de Bike",
-  "Cambio y Ajustes de  Partes"
-];
+// --- MAPA DE ICONOS DINÁMICOS ---
+// Permite renderizar el icono correcto según la configuración guardada en texto
+const IconMap = {
+  Bike, Wrench,           // Bicis
+  Smartphone, Cpu,        // Tech
+  Scissors, Sparkles,     // Belleza
+  Dumbbell, Trophy,       // Deportes
+  Stethoscope, Heart,     // Salud
+  Car, Key,               // Autos
+  PawPrint, Bone          // Mascotas
+};
 
-const GENERIC_PASS = "Taller2025"; 
+// --- CONFIGURACIÓN MAESTRA MULTI-INDUSTRIA (SAAS) ---
+const INDUSTRIES = {
+  bikes: {
+    label: "Taller de Bicicletas",
+    itemLabel: "Modelo de Bici",    // Qué trae el cliente?
+    staffLabel: "Mecánico",         // Quién atiende?
+    actionLabel: "Reparar",         // Verbo de acción
+    defaultServices: ["Mantenimiento General", "Revisión Frenos", "Armado de Bike", "Parchado", "Lavado"],
+    icons: { item: 'Bike', staff: 'Wrench' }
+  },
+  tech: {
+    label: "Servicio Técnico",
+    itemLabel: "Dispositivo",
+    staffLabel: "Técnico",
+    actionLabel: "Reparar",
+    defaultServices: ["Diagnóstico PC/Laptop", "Cambio de Pantalla", "Mantenimiento Software", "Recuperación de Datos", "Limpieza Interna"],
+    icons: { item: 'Smartphone', staff: 'Cpu' }
+  },
+  beauty: {
+    label: "Estética y Belleza",
+    itemLabel: "Cliente / Preferencia",
+    staffLabel: "Estilista",
+    actionLabel: "Atender",
+    defaultServices: ["Corte y Peinado", "Coloración", "Manicura/Pedicura", "Limpieza Facial", "Barbería"],
+    icons: { item: 'Sparkles', staff: 'Scissors' }
+  },
+  sports: {
+    label: "Complejo Deportivo",
+    itemLabel: "Cancha / Espacio",
+    staffLabel: "Instructor/Admin",
+    actionLabel: "Reservar",
+    defaultServices: ["Alquiler Cancha (60 min)", "Alquiler Cancha (90 min)", "Clase Grupal", "Entrenamiento Personal"],
+    icons: { item: 'Trophy', staff: 'Dumbbell' }
+  },
+  health: {
+    label: "Consultorio / Salud",
+    itemLabel: "Paciente / Motivo",
+    staffLabel: "Profesional",
+    actionLabel: "Consultar",
+    defaultServices: ["Consulta General", "Control", "Kinesiología", "Nutrición", "Análisis"],
+    icons: { item: 'Heart', staff: 'Stethoscope' }
+  },
+  automotive: {
+    label: "Taller Automotriz",
+    itemLabel: "Vehículo",
+    staffLabel: "Mecánico",
+    actionLabel: "Revisar",
+    defaultServices: ["Service 10k km", "Cambio de Aceite", "Alineación y Balanceo", "Revisión Frenos"],
+    icons: { item: 'Car', staff: 'Wrench' }
+  },
+  pets: {
+    label: "Veterinaria / Pet Shop",
+    itemLabel: "Mascota",
+    staffLabel: "Veterinario",
+    actionLabel: "Tratar",
+    defaultServices: ["Baño y Corte", "Consulta Veterinaria", "Vacunación", "Desparasitación"],
+    icons: { item: 'PawPrint', staff: 'Bone' }
+  }
+};
+
+const GENERIC_PASS = "Turno2026";
 
 // --- HELPERS ---
 const formatDateForQuery = (d) => d.toISOString().split('T')[0];
@@ -103,6 +180,7 @@ export default function App() {
     lastOrderNumber: 1000,
     blockedDates: [],
     implementationDate: '' // Nueva config
+    industry: 'bikes' // Valor por defecto
   });
   const [configSuccess, setConfigSuccess] = useState(false);
   const [dateToBlock, setDateToBlock] = useState('');
@@ -128,15 +206,24 @@ export default function App() {
   const [selectedTimeBlock, setSelectedTimeBlock] = useState(null);
   const [apptNotes, setApptNotes] = useState('');
   const [clientBikeModel, setClientBikeModel] = useState('');
-  const [serviceType, setServiceType] = useState(SERVICE_TYPES[0]);
+  // Usa el primer servicio de la industria activa por defecto
+const [serviceType, setServiceType] = useState(
+  (INDUSTRIES[shopConfig.industry || 'bikes'].defaultServices[0])
+);
   
   // New Admin Appt Form State
   const [adminApptStep, setAdminApptStep] = useState(1); // 1: DNI, 2: Form
   const [adminDniSearch, setAdminDniSearch] = useState('');
   const [isNewClient, setIsNewClient] = useState(false);
   const [adminFormData, setAdminFormData] = useState({ 
-      name: '', bikeModel: '', phone: '', date: '', serviceType: SERVICE_TYPES[0], notes: '' 
-  });
+    name: '', 
+    bikeModel: '', 
+    phone: '', 
+    date: '', 
+    // Usamos la lista dinámica de la industria activa
+    serviceType: activeIndustry.defaultServices[0], 
+    notes: '' 
+});
   const [showAdminApptModal, setShowAdminApptModal] = useState(false);
   
   // Modals
@@ -158,6 +245,13 @@ export default function App() {
   const [newMechPassword, setNewMechPassword] = useState(GENERIC_PASS);
   const [newMechIsAdmin, setNewMechIsAdmin] = useState(false);
 
+  // Determinar la configuración actual basada en el estado
+const activeIndustry = INDUSTRIES[shopConfig.industry] || INDUSTRIES.bikes;
+// Determinar qué icono usar
+const ItemIcon = IconMap[activeIndustry.icons.item];
+const StaffIcon = IconMap[activeIndustry.icons.staff];
+// Determinar servicios (si la config de la DB tiene servicios personalizados, úsalos, sino usa los default)
+const availableServices = shopConfig.customServices || activeIndustry.defaultServices;
   // --- HOTFIX: Inyectar Tailwind CSS CDN ---
   useEffect(() => {
     const scriptId = 'tailwind-cdn-style';
@@ -758,7 +852,12 @@ export default function App() {
                 <div className="text-center mb-2"><h2 className="text-xl font-bold text-white">Crea tu Perfil 🚲</h2><p className="text-slate-400 text-xs">Solo te pediremos esto una vez.</p></div>
                 <input value={loginForm.name} onChange={e=>setLoginForm({...loginForm,name:e.target.value})} required className="w-full bg-slate-900/50 border-slate-700 border rounded-xl p-3.5 text-white focus:ring-2 focus:ring-orange-500 outline-none transition-all" placeholder="Tu Nombre Completo" />
                 <input value={loginForm.phone} onChange={e=>setLoginForm({...loginForm,phone:e.target.value})} className="w-full bg-slate-900/50 border-slate-700 border rounded-xl p-3.5 text-white focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Celular / WhatsApp" />
-                <input value={loginForm.bikeModel} onChange={e=>setLoginForm({...loginForm,bikeModel:e.target.value})} className="w-full bg-slate-900/50 border-slate-700 border rounded-xl p-3.5 text-white focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Modelo de tu Bici (Opcional)" />
+            <input 
+  value={loginForm.bikeModel} 
+  onChange={e=>setLoginForm({...loginForm,bikeModel:e.target.value})} 
+  className="w-full bg-slate-900/50 border-slate-700 border rounded-xl p-3.5 text-white focus:ring-2 focus:ring-orange-500 outline-none" 
+  placeholder={`${activeIndustry.itemLabel} (Opcional)`} 
+/>
                 {/* EMAIL OPCIONAL RECOMENDADO */}
                 <input value={loginForm.email} onChange={e=>setLoginForm({...loginForm,email:e.target.value})} type="email" className="w-full bg-slate-900/50 border-slate-700 border rounded-xl p-3.5 text-white focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Email (Opcional)" />
                 <Button type="submit" className="w-full py-3.5 mt-2">Registrarme</Button>
@@ -770,7 +869,7 @@ export default function App() {
 
   if (view === 'client-dashboard') return (
     <div className="min-h-screen bg-slate-950 pb-20"><Header /><main className="max-w-5xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-0">
-        <div className="lg:col-span-2"><h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><span className="bg-orange-600/20 text-orange-500 p-2 rounded-lg"><Plus size={24}/></span> Reservar Nuevo Turno</h2><Card><div className="mb-8"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">1. Selecciona un Día</h3>{renderDateSelector(setSelectedDate, selectedDate)}</div>{selectedDate && <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">2. Elige Horario</h3><div className="grid grid-cols-2 gap-4"><button onClick={()=>setSelectedTimeBlock('morning')} className={`p-5 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-300 ${selectedTimeBlock==='morning'?'bg-orange-600 border-orange-500 text-white shadow-orange-900/20 shadow-xl scale-[1.02]':'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'}`}><Sun size={28}/><span>Mañana</span><span className="text-xs opacity-60 font-mono bg-black/20 px-2 py-0.5 rounded">08:00 - 10:00</span></button><button onClick={()=>setSelectedTimeBlock('afternoon')} className={`p-5 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-300 ${selectedTimeBlock==='afternoon'?'bg-orange-600 border-orange-500 text-white shadow-orange-900/20 shadow-xl scale-[1.02]':'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'}`}><Moon size={28}/><span>Tarde</span><span className="text-xs opacity-60 font-mono bg-black/20 px-2 py-0.5 rounded">17:30 - 19:00</span></button></div></div>}{selectedDate && selectedTimeBlock && <div className="animate-in fade-in slide-in-from-top-4 duration-500"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">3. Confirmar Reserva</h3><div className="space-y-4 bg-slate-900/50 p-6 rounded-2xl border border-slate-800 mb-6"><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Tu Bici (Puedes editarla):</label><input value={clientBikeModel} onChange={e=>setClientBikeModel(e.target.value)} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="Ej: SLP 29 Pro" /></div><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Servicio:</label><select value={serviceType} onChange={e=>setServiceType(e.target.value)} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none">{SERVICE_TYPES.map(s=><option key={s} value={s}>{s}</option>)}</select></div><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Notas Adicionales:</label><textarea value={apptNotes} onChange={e=>setApptNotes(e.target.value)} rows="2" className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none resize-none" placeholder="¿Algún ruido raro? ¿Detalle específico?"/></div></div><Button onClick={createClientAppointment} disabled={isSubmitting} className="w-full py-4 text-lg shadow-orange-900/40">{isSubmitting ? <span className="flex items-center gap-2"><Loader2 className="animate-spin"/> Reservando...</span> : 'Confirmar Reserva'}</Button></div>}</Card></div>
+        <div className="lg:col-span-2"><h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><span className="bg-orange-600/20 text-orange-500 p-2 rounded-lg"><Plus size={24}/></span> Reservar Nuevo Turno</h2><Card><div className="mb-8"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">1. Selecciona un Día</h3>{renderDateSelector(setSelectedDate, selectedDate)}</div>{selectedDate && <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">2. Elige Horario</h3><div className="grid grid-cols-2 gap-4"><button onClick={()=>setSelectedTimeBlock('morning')} className={`p-5 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-300 ${selectedTimeBlock==='morning'?'bg-orange-600 border-orange-500 text-white shadow-orange-900/20 shadow-xl scale-[1.02]':'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'}`}><Sun size={28}/><span>Mañana</span><span className="text-xs opacity-60 font-mono bg-black/20 px-2 py-0.5 rounded">08:00 - 10:00</span></button><button onClick={()=>setSelectedTimeBlock('afternoon')} className={`p-5 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-300 ${selectedTimeBlock==='afternoon'?'bg-orange-600 border-orange-500 text-white shadow-orange-900/20 shadow-xl scale-[1.02]':'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'}`}><Moon size={28}/><span>Tarde</span><span className="text-xs opacity-60 font-mono bg-black/20 px-2 py-0.5 rounded">17:30 - 19:00</span></button></div></div>}{selectedDate && selectedTimeBlock && <div className="animate-in fade-in slide-in-from-top-4 duration-500"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">3. Confirmar Reserva</h3><div className="space-y-4 bg-slate-900/50 p-6 rounded-2xl border border-slate-800 mb-6"><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Tu Bici (Puedes editarla):</label><input value={clientBikeModel} onChange={e=>setClientBikeModel(e.target.value)} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="Ej: SLP 29 Pro" /></div><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Servicio:</label><select value={serviceType} onChange={e=>setServiceType(e.target.value)} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none">{availableServices.map(s=><option key={s} value={s}>{s}</option>)}</select></div><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Notas Adicionales:</label><textarea value={apptNotes} onChange={e=>setApptNotes(e.target.value)} rows="2" className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none resize-none" placeholder="¿Algún ruido raro? ¿Detalle específico?"/></div></div><Button onClick={createClientAppointment} disabled={isSubmitting} className="w-full py-4 text-lg shadow-orange-900/40">{isSubmitting ? <span className="flex items-center gap-2"><Loader2 className="animate-spin"/> Reservando...</span> : 'Confirmar Reserva'}</Button></div>}</Card></div>
         <div className="lg:col-span-1 space-y-6"><h2 className="text-xl font-bold text-white mb-4 flex items-center gap-3"><span className="bg-slate-800 text-slate-400 p-2 rounded-lg"><ClipboardList size={24}/></span> Mis Turnos</h2>{appointments.filter(a=>a.clientDni===appUser.dni).length===0?<div className="text-center py-16 bg-slate-900/50 rounded-3xl border-2 border-dashed border-slate-800"><Bike className="mx-auto text-slate-700 mb-4" size={64}/><p className="text-slate-500 font-medium">No tienes turnos activos.</p></div>:appointments.filter(a=>a.clientDni===appUser.dni).map(appt=>{
             const isFuture = new Date(appt.date) > new Date();
             return <Card key={appt.id} className="relative group overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Bike size={80}/></div><div className="flex flex-col gap-3 relative z-10"><div className="flex justify-between items-center mb-1"><Badge status={appt.status}/><span className="text-xs font-mono text-slate-500 bg-slate-900 px-2 py-1 rounded">#{appt.orderId}</span></div><div><h3 className="text-lg font-bold text-white leading-tight">{appt.serviceType}</h3><p className="text-slate-400 text-sm mt-1">{appt.bikeModel}</p></div><div className="flex items-center gap-3 mt-2 bg-slate-900/60 p-3 rounded-xl text-sm text-slate-300 border border-slate-800"><Calendar size={16} className="text-orange-500"/><div className="flex flex-col leading-none"><span className="text-xs text-slate-500 font-bold uppercase">Fecha</span><span>{new Date(appt.date).toLocaleDateString()} • {appt.timeBlock==='morning'?'Mañana':'Tarde'}</span></div></div>{(appt.status === 'pendiente' && isFuture) && <Button variant="secondary" onClick={()=>openRescheduleModal(appt, 'client')} className="w-full text-xs mt-2 border-slate-700">Reprogramar (48hs)</Button>}</div></Card>
@@ -813,7 +912,7 @@ export default function App() {
                     <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700 flex justify-between items-center mb-4"><div className="flex items-center gap-2"><User size={16} className="text-blue-400"/><span className="text-white font-bold">{adminDniSearch}</span></div>{isNewClient ? <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded border border-orange-500/30">Nuevo Cliente</span> : <span className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30">Cliente Existente</span>}</div>
                     <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre Completo</label><input required value={adminFormData.name} onChange={e=>setAdminFormData({...adminFormData, name:e.target.value})} className={`w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition ${!isNewClient ? 'opacity-80' : ''}`} placeholder="Nombre y Apellido" /></div>
                     <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Teléfono</label><input required value={adminFormData.phone} onChange={e=>setAdminFormData({...adminFormData, phone:e.target.value})} type="tel" className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" placeholder="WhatsApp" /></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bicicleta</label><input value={adminFormData.bikeModel} onChange={e=>setAdminFormData({...adminFormData, bikeModel:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" placeholder="Modelo" /></div></div>
-                    <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</label><input type="datetime-local" required value={adminFormData.date} onChange={e=>setAdminFormData({...adminFormData, date:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white [color-scheme:dark] outline-none focus:border-blue-500 transition" /></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Servicio</label><select value={adminFormData.serviceType} onChange={e=>setAdminFormData({...adminFormData, serviceType:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition">{SERVICE_TYPES.map(s=><option key={s} value={s}>{s}</option>)}</select></div></div>
+                    <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</label><input type="datetime-local" required value={adminFormData.date} onChange={e=>setAdminFormData({...adminFormData, date:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white [color-scheme:dark] outline-none focus:border-blue-500 transition" /></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Servicio</label><select value={adminFormData.serviceType} onChange={e=>setAdminFormData({...adminFormData, serviceType:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition">{availableServices.map(s=><option key={s} value={s}>{s}</option>)}</select></div></div>
                     <Button type="submit" variant="admin" disabled={isSubmitting} className="w-full py-4 text-lg mt-4">{isSubmitting ? 'Guardando...' : (isNewClient ? 'Crear Cliente y Turno' : 'Agendar Turno')}</Button>
                     <button type="button" onClick={()=>setAdminApptStep(1)} className="w-full text-center text-xs text-slate-500 hover:text-white mt-2">Volver atrás</button>
                 </form>
@@ -821,7 +920,9 @@ export default function App() {
         </Card></div>}
 
         {subView === 'dashboard' && <>
-            {receptionModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-lg relative bg-slate-900 border-slate-700 shadow-2xl"><button onClick={()=>setReceptionModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle/></button><h3 className="text-2xl font-bold text-white mb-2">Recepción de Bicicleta</h3><div className="bg-blue-900/20 border border-blue-500/20 p-4 rounded-xl mb-6 flex items-center gap-3"><User className="text-blue-400"/><div className="text-sm"><p className="text-blue-200 font-bold">{receptionModal.appt.clientName}</p><p className="text-blue-400/60">DNI: {receptionModal.appt.clientDni}</p></div></div><form onSubmit={handleReceptionConfirm} className="space-y-5"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Modelo Bici (Verificar)</label><input value={receptionModal.bikeModel} onChange={e=>setReceptionModal({...receptionModal, bikeModel:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition"/></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Servicio a Realizar</label><select value={receptionModal.serviceType} onChange={e=>setReceptionModal({...receptionModal, serviceType:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition">{SERVICE_TYPES.map(s=><option key={s} value={s}>{s}</option>)}</select></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Notas / Diagnóstico Visual</label><textarea value={receptionModal.notes} onChange={e=>setReceptionModal({...receptionModal, notes:e.target.value})} rows="3" className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition resize-none" placeholder="Rayones, estado general..."/></div><Button type="submit" className="w-full py-4 text-lg mt-2">Confirmar e Imprimir Orden</Button></form></Card></div>}
+            {receptionModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-lg relative bg-slate-900 border-slate-700 shadow-2xl"><button onClick={()=>setReceptionModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle/></button><h3 className="text-2xl font-bold text-white mb-2">Recepción de Bicicleta</h3><div className="bg-blue-900/20 border border-blue-500/20 p-4 rounded-xl mb-6 flex items-center gap-3"><User className="text-blue-400"/><div className="text-sm"><p className="text-blue-200 font-bold">{receptionModal.appt.clientName}</p><p className="text-blue-400/60">DNI: {receptionModal.appt.clientDni}</p></div></div><form onSubmit={handleReceptionConfirm} className="space-y-5"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+  {activeIndustry.itemLabel} (Verificar)
+</label><input value={receptionModal.bikeModel} onChange={e=>setReceptionModal({...receptionModal, bikeModel:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition"/></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Servicio a Realizar</label><select value={receptionModal.serviceType} onChange={e=>setReceptionModal({...receptionModal, serviceType:e.target.value})} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition">{availableServices.map(s=><option key={s} value={s}>{s}</option>)}</select></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Notas / Diagnóstico Visual</label><textarea value={receptionModal.notes} onChange={e=>setReceptionModal({...receptionModal, notes:e.target.value})} rows="3" className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition resize-none" placeholder="Rayones, estado general..."/></div><Button type="submit" className="w-full py-4 text-lg mt-2">Confirmar e Imprimir Orden</Button></form></Card></div>}
             
             <div className="mb-8 p-4 bg-slate-900/50 rounded-2xl border border-slate-800 grid grid-cols-1 md:grid-cols-12 gap-4 shadow-inner">
                 <div className="md:col-span-4 relative"><Search className="absolute left-4 top-3.5 text-slate-500" size={20}/><input placeholder="Buscar ID, Cliente, Bici..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} className="w-full bg-slate-950 border-slate-800 border rounded-xl pl-12 p-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-600"/></div>
