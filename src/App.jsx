@@ -53,7 +53,9 @@ const IconMap = {
 };
 
 // --- CONFIGURACIÓN MAESTRA MULTI-INDUSTRIA (SAAS) ---
+// --- CONFIGURACIÓN MAESTRA MULTI-INDUSTRIA (SAAS) ---
 const INDUSTRIES = {
+  // 1. BICICLETAS
   bikes: {
     label: "Taller de Bicicletas",
     itemLabel: "Modelo de Bici",
@@ -62,64 +64,82 @@ const INDUSTRIES = {
     actionLabel: "Reparar",
     defaultServices: ["Service 30 dias postcompra", "Mantenimiento General", "Revisión 7 dias", "Cambio de partes"],
     icons: { item: 'Bike', staff: 'Wrench' },
-    statusLabels: { 
-        pending: 'En Espera', 
-        received: 'En Taller', 
-        process: 'En Reparación', 
-        ready: 'Listo para Retirar' 
-    },
+    statusLabels: { pending: 'En Espera', received: 'En Taller', process: 'En Reparación', ready: 'Listo para Retirar' },
     disclaimer: "AUTORIZO LA REPARACIÓN. EL TALLER NO SE RESPONSABILIZA POR EFECTOS PERSONALES DEJADOS EN LA UNIDAD."
   },
+  // 2. TECNOLOGÍA
   tech: {
     label: "Servicio Técnico",
     itemLabel: "Dispositivo",
     staffLabel: "Técnico",
     placeLabel: "Laboratorio",
     actionLabel: "Reparar",
-    defaultServices: ["Diagnóstico", "Cambio Pantalla", "Formateo"],
+    defaultServices: ["Diagnóstico", "Cambio Pantalla", "Formateo", "Limpieza Hardware"],
     icons: { item: 'Smartphone', staff: 'Cpu' },
-    statusLabels: { 
-        pending: 'En Espera', 
-        received: 'Ingresado', 
-        process: 'En Diagnóstico/Rep', 
-        ready: 'Listo para Retirar' 
-    },
+    statusLabels: { pending: 'En Espera', received: 'Ingresado', process: 'En Diagnóstico/Rep', ready: 'Listo para Retirar' },
     disclaimer: "AUTORIZO EL DIAGNÓSTICO Y REPARACIÓN. LA EMPRESA NO SE RESPONSABILIZA POR LA PÉRDIDA DE DATOS NO RESGUARDADOS."
   },
+  // 3. BELLEZA
   beauty: {
     label: "Estética y Belleza",
     itemLabel: "Cliente",
     staffLabel: "Estilista",
     placeLabel: "Salón",
     actionLabel: "Atender",
-    defaultServices: ["Corte", "Color", "Manicura"],
+    defaultServices: ["Corte", "Color", "Manicura", "Tratamiento Facial"],
     icons: { item: 'Sparkles', staff: 'Scissors' },
-    statusLabels: { 
-        pending: 'Reservado', 
-        received: 'En Sala de Espera', 
-        process: 'Siendo Atendido', 
-        ready: 'Finalizado' 
-    },
+    statusLabels: { pending: 'Reservado', received: 'En Sala de Espera', process: 'Siendo Atendido', ready: 'Finalizado' },
     disclaimer: "EL CLIENTE ACEPTA LOS PROCEDIMIENTOS ESTÉTICOS A REALIZAR Y SUS POSIBLES CUIDADOS POSTERIORES."
   },
+  // 4. DEPORTES
   sports: {
     label: "Complejo Deportivo",
     itemLabel: "Cancha",
     staffLabel: "Admin",
     placeLabel: "Club",
     actionLabel: "Jugar",
-    defaultServices: ["Cancha 60min", "Cancha 90min", "Clase"],
+    defaultServices: ["Cancha 60min", "Cancha 90min", "Clase Grupal"],
     icons: { item: 'Trophy', staff: 'User' },
-    statusLabels: { 
-        pending: 'Reservado', 
-        received: 'Check-in Realizado', 
-        process: 'Jugando', 
-        ready: 'Turno Finalizado' 
-    },
+    statusLabels: { pending: 'Reservado', received: 'Check-in Realizado', process: 'Jugando', ready: 'Turno Finalizado' },
     disclaimer: "EL USUARIO SE COMPROMETE A CUIDAR LAS INSTALACIONES. EL CLUB NO SE RESPONSABILIZA POR LESIONES DEPORTIVAS."
+  },
+  // 5. AUTOMOTRIZ (NUEVO)
+  cars: {
+    label: "Taller Automotriz",
+    itemLabel: "Vehículo",
+    staffLabel: "Mecánico",
+    placeLabel: "Taller",
+    actionLabel: "Reparar",
+    defaultServices: ["Cambio de Aceite", "Alineación y Balanceo", "Frenos", "Diagnóstico Computarizado"],
+    icons: { item: 'Car', staff: 'Wrench' },
+    statusLabels: { pending: 'Turno Solicitado', received: 'Vehículo Ingresado', process: 'En Reparación', ready: 'Listo para Retirar' },
+    disclaimer: "AUTORIZO EL TRABAJO MECÁNICO. EL TALLER NO SE RESPONSABILIZA POR OBJETOS DE VALOR DEJADOS EN EL VEHÍCULO."
+  },
+  // 6. VETERINARIA (NUEVO)
+  pets: {
+    label: "Clínica Veterinaria",
+    itemLabel: "Mascota",
+    staffLabel: "Veterinario",
+    placeLabel: "Clínica",
+    actionLabel: "Atender",
+    defaultServices: ["Consulta General", "Vacunación", "Desparasitación", "Control"],
+    icons: { item: 'PawPrint', staff: 'Stethoscope' },
+    statusLabels: { pending: 'Cita Agendada', received: 'En Sala de Espera', process: 'En Consulta', ready: 'Alta Médica' },
+    disclaimer: "EL DUEÑO AUTORIZA LOS PROCEDIMIENTOS VETERINARIOS NECESARIOS PARA EL BIENESTAR DE LA MASCOTA."
+  },
+  // 7. SALUD (NUEVO)
+  health: {
+    label: "Consultorio Médico",
+    itemLabel: "Paciente",
+    staffLabel: "Doctor",
+    placeLabel: "Consultorio",
+    actionLabel: "Atender",
+    defaultServices: ["Consulta", "Control", "Certificado", "Aptitud Física"],
+    icons: { item: 'Heart', staff: 'Stethoscope' },
+    statusLabels: { pending: 'Turno Confirmado', received: 'En Recepción', process: 'En Consultorio', ready: 'Atendido' },
+    disclaimer: "LA INFORMACIÓN MÉDICA ES CONFIDENCIAL Y ESTÁ PROTEGIDA POR EL SECRETO PROFESIONAL."
   }
 };
-
 const GENERIC_PASS = "Turno2026";
 
 // --- HELPERS ---
