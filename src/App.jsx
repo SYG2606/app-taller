@@ -258,6 +258,11 @@ export default function App() {
   const [newMechName, setNewMechName] = useState('');
   const [newMechPassword, setNewMechPassword] = useState(GENERIC_PASS);
   const [newMechIsAdmin, setNewMechIsAdmin] = useState(false);
+  const filteredAppts = appointments.filter(a => {
+  const term = searchTerm.toLowerCase();
+      // ... lógica de filtrado ...
+      return match && status && date;
+  });
 
   // --- HOTFIX: Inyectar Tailwind CSS CDN ---
   useEffect(() => {
@@ -830,7 +835,8 @@ export default function App() {
   };
 
   const printList = () => {
-    const list = getFilteredAppointments();
+    const list = filteredAppts;
+    
     const content = `<html><head><title>Reporte</title><style>table{width:100%;border-collapse:collapse;font-family:sans-serif}th,td{border:1px solid #ddd;padding:8px}th{background-color:#f2f2f2}</style></head><body><h1>Reporte Turnos</h1><table><thead><tr><th>Orden</th><th>Fecha</th><th>Cliente</th><th>Bici</th><th>Servicio</th><th>Estado</th></tr></thead><tbody>${list.map(a=>`<tr><td>${a.orderId ? '#'+a.orderId : a.id.slice(0,6)}</td><td>${new Date(a.date).toLocaleDateString()}</td><td>${a.clientName}</td><td>${a.bikeModel}</td><td>${a.serviceType}</td><td>${a.status}</td></tr>`).join('')}</tbody></table></body></html>`;
     const win = window.open('','','width=900,height=600'); win.document.write(content); win.document.close(); win.print();
   };
