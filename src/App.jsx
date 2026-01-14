@@ -56,59 +56,69 @@ const IconMap = {
 const INDUSTRIES = {
   bikes: {
     label: "Taller de Bicicletas",
-    itemLabel: "Modelo de Bici",    // Qué trae el cliente?
-    staffLabel: "Mecánico",         // Quién atiende?
-    actionLabel: "Reparar",         // Verbo de acción
-    defaultServices: ["Mantenimiento General", "Revisión Frenos", "Armado de Bike", "Parchado", "Lavado"],
-    icons: { item: 'Bike', staff: 'Wrench' }
+    itemLabel: "Modelo de Bici",
+    staffLabel: "Mecánico",
+    placeLabel: "Taller", // <--- NUEVO
+    actionLabel: "Reparar",
+    defaultServices: ["Mantenimiento General", "Revisión Frenos", "Parchado"],
+    icons: { item: 'Bike', staff: 'Wrench' },
+    // NUEVO: Cómo se muestran los estados
+    statusLabels: { 
+        pending: 'En Espera', 
+        received: 'En Taller', 
+        process: 'En Reparación', 
+        ready: 'Listo para Retirar' 
+    },
+    // NUEVO: Texto legal para la impresión
+    disclaimer: "AUTORIZO LA REPARACIÓN. EL TALLER NO SE RESPONSABILIZA POR EFECTOS PERSONALES DEJADOS EN LA UNIDAD."
   },
   tech: {
     label: "Servicio Técnico",
     itemLabel: "Dispositivo",
     staffLabel: "Técnico",
+    placeLabel: "Laboratorio", // <--- NUEVO
     actionLabel: "Reparar",
-    defaultServices: ["Diagnóstico PC/Laptop", "Cambio de Pantalla", "Mantenimiento Software", "Recuperación de Datos", "Limpieza Interna"],
-    icons: { item: 'Smartphone', staff: 'Cpu' }
+    defaultServices: ["Diagnóstico", "Cambio Pantalla", "Formateo"],
+    icons: { item: 'Smartphone', staff: 'Cpu' },
+    statusLabels: { 
+        pending: 'En Espera', 
+        received: 'Ingresado', 
+        process: 'En Diagnóstico/Rep', 
+        ready: 'Listo para Retirar' 
+    },
+    disclaimer: "AUTORIZO EL DIAGNÓSTICO Y REPARACIÓN. LA EMPRESA NO SE RESPONSABILIZA POR LA PÉRDIDA DE DATOS NO RESGUARDADOS."
   },
   beauty: {
     label: "Estética y Belleza",
-    itemLabel: "Cliente / Preferencia",
+    itemLabel: "Cliente",
     staffLabel: "Estilista",
+    placeLabel: "Salón", // <--- NUEVO
     actionLabel: "Atender",
-    defaultServices: ["Corte y Peinado", "Coloración", "Manicura/Pedicura", "Limpieza Facial", "Barbería"],
-    icons: { item: 'Sparkles', staff: 'Scissors' }
+    defaultServices: ["Corte", "Color", "Manicura"],
+    icons: { item: 'Sparkles', staff: 'Scissors' },
+    statusLabels: { 
+        pending: 'Reservado', 
+        received: 'En Sala de Espera', 
+        process: 'Siendo Atendido', 
+        ready: 'Finalizado' 
+    },
+    disclaimer: "EL CLIENTE ACEPTA LOS PROCEDIMIENTOS ESTÉTICOS A REALIZAR Y SUS POSIBLES CUIDADOS POSTERIORES."
   },
   sports: {
     label: "Complejo Deportivo",
-    itemLabel: "Cancha / Espacio",
-    staffLabel: "Instructor/Admin",
-    actionLabel: "Reservar",
-    defaultServices: ["Alquiler Cancha (60 min)", "Alquiler Cancha (90 min)", "Clase Grupal", "Entrenamiento Personal"],
-    icons: { item: 'Trophy', staff: 'Dumbbell' }
-  },
-  health: {
-    label: "Consultorio / Salud",
-    itemLabel: "Paciente / Motivo",
-    staffLabel: "Profesional",
-    actionLabel: "Consultar",
-    defaultServices: ["Consulta General", "Control", "Kinesiología", "Nutrición", "Análisis"],
-    icons: { item: 'Heart', staff: 'Stethoscope' }
-  },
-  automotive: {
-    label: "Taller Automotriz",
-    itemLabel: "Vehículo",
-    staffLabel: "Mecánico",
-    actionLabel: "Revisar",
-    defaultServices: ["Service 10k km", "Cambio de Aceite", "Alineación y Balanceo", "Revisión Frenos"],
-    icons: { item: 'Car', staff: 'Wrench' }
-  },
-  pets: {
-    label: "Veterinaria / Pet Shop",
-    itemLabel: "Mascota",
-    staffLabel: "Veterinario",
-    actionLabel: "Tratar",
-    defaultServices: ["Baño y Corte", "Consulta Veterinaria", "Vacunación", "Desparasitación"],
-    icons: { item: 'PawPrint', staff: 'Bone' }
+    itemLabel: "Cancha",
+    staffLabel: "Admin",
+    placeLabel: "Club", // <--- NUEVO
+    actionLabel: "Jugar",
+    defaultServices: ["Cancha 60min", "Cancha 90min", "Clase"],
+    icons: { item: 'Trophy', staff: 'User' },
+    statusLabels: { 
+        pending: 'Reservado', 
+        received: 'Check-in Realizado', 
+        process: 'Jugando', 
+        ready: 'Turno Finalizado' 
+    },
+    disclaimer: "EL USUARIO SE COMPROMETE A CUIDAR LAS INSTALACIONES. EL CLUB NO SE RESPONSABILIZA POR LESIONES DEPORTIVAS."
   }
 };
 
@@ -145,15 +155,30 @@ const Card = ({ children, className = '', onClick }) => (
   </div>
 );
 
-const Badge = ({ status }) => {
+// Ahora Badge recibe "labels" como prop opcional
+const Badge = ({ status, labels }) => {
   const styles = {
     'pendiente': 'bg-slate-500/10 text-slate-400 border-slate-500/20',
     'recibido': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
     'en-proceso': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
     'listo': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
   };
-  const labels = { 'pendiente': 'Reservado', 'recibido': 'En Taller', 'en-proceso': 'En Reparación', 'listo': 'Finalizado' };
-  return <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${styles[status] || styles['pendiente']}`}>{labels[status] || status}</span>;
+  
+  // Usamos los labels personalizados o unos por defecto si fallara
+  const defaultLabels = { 'pendiente': 'Pendiente', 'recibido': 'Recibido', 'en-proceso': 'En Proceso', 'listo': 'Listo' };
+  const currentLabels = labels || defaultLabels;
+
+  // Mapeo de claves de DB a claves de Config
+  const statusKeyMap = { 
+      'pendiente': 'pending', 
+      'recibido': 'received', 
+      'en-proceso': 'process', 
+      'listo': 'ready' 
+  };
+
+  const displayText = currentLabels[statusKeyMap[status]] || status;
+
+  return <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${styles[status] || styles['pendiente']}`}>{displayText}</span>;
 };
 
 // --- APP PRINCIPAL ---
@@ -180,6 +205,11 @@ export default function App() {
     lastOrderNumber: 1000,
     blockedDates: [],
     implementationDate: '', // Nueva config
+    // NUEVOS CAMPOS DE AGENDA
+    scheduleMode: 'blocks', // 'blocks' o 'slots'
+    slotDuration: 60,       // minutos (30, 45, 60)
+    openHour: 9,            // 09:00
+    closeHour: 18,          // 18:00
     industry: 'bikes' // Valor por defecto
   });
   // Determinar la configuración actual basada en el estado
@@ -393,7 +423,17 @@ const [serviceType, setServiceType] = useState(
         }
 
         const d = new Date(selectedDate);
-        if (selectedTimeBlock === 'morning') d.setHours(9); else d.setHours(18);
+        
+        // LOGICA DE HORA
+        if (shopConfig.scheduleMode === 'slots') {
+            // Si es slot (ej: "10:30"), parseamos la hora
+            const [hours, minutes] = selectedTimeBlock.split(':').map(Number);
+            d.setHours(hours, minutes, 0, 0);
+        } else {
+            // Si es bloque (legacy)
+            if (selectedTimeBlock === 'morning') d.setHours(9, 0, 0, 0); 
+            else d.setHours(18, 0, 0, 0);
+        }
         
         const orderNum = await generateOrderNumber();
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'turnos'), {
@@ -410,7 +450,23 @@ const [serviceType, setServiceType] = useState(
         setIsSubmitting(false);
     }
   };
+// --- GENERADOR DE HORARIOS (SLOTS) ---
+  const generateTimeSlots = () => {
+    const slots = [];
+    let currentTime = new Date();
+    currentTime.setHours(shopConfig.openHour, 0, 0, 0); // Hora inicio
 
+    const endTime = new Date();
+    endTime.setHours(shopConfig.closeHour, 0, 0, 0);    // Hora fin
+
+    while (currentTime < endTime) {
+      const timeString = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      slots.push(timeString);
+      // Sumar duración del turno
+      currentTime.setMinutes(currentTime.getMinutes() + shopConfig.slotDuration);
+    }
+    return slots;
+  };
   // --- LOGICA NUEVA PARA ADMIN APPOINTMENT ---
   const handleAdminDniSearch = async (e) => {
       e.preventDefault();
@@ -658,7 +714,7 @@ const [serviceType, setServiceType] = useState(
     const content = `
       <html><head><title>Orden #${appt.orderId}</title><style>${styles}</style></head>
       <body>
-        <!-- COPIA TALLER -->
+        <!-- Copia {activeIndustry.placeLabel} -->
         <div class="container">
             <div class="header">
                 ${logoHtml}
@@ -682,12 +738,13 @@ const [serviceType, setServiceType] = useState(
             <div class="title">NOTAS / ESTADO</div>
             <p style="font-size:11px; margin:0">${appt.notes || 'Sin observaciones.'}</p>
             
-            <div class="disclaimer">
-               AUTORIZO LA REPARACIÓN ARRIBA DETALLADA. EL TALLER NO SE RESPONSABILIZA POR EFECTOS PERSONALES DEJADOS EN LA BICICLETA. PASADOS 30 DÍAS SE COBRARÁ ESTADÍA.
-            </div>
+            // Donde tenías el texto fijo "AUTORIZO LA REPARACIÓN..."
+<div class="disclaimer">
+    ${activeIndustry.disclaimer}
+</div>
             <br/><br/>
             <div class="row" style="margin-top:20px"><span>________________</span><span>________________</span></div>
-            <div class="row"><span>Firma Cliente</span><span>Firma Taller</span></div>
+            <div class="row"><span>Firma Cliente</span><span>Firma {activeIndustry.placeLabel}</span></div>
         </div>
 
         <!-- LINEA DE CORTE -->
@@ -706,9 +763,7 @@ const [serviceType, setServiceType] = useState(
             <div class="row"><span>Recibimos:</span><strong>${appt.bikeModel}</strong></div>
             <div class="row"><span>Atendido por:</span><span>${appt.receivedBy || 'Staff'}</span></div>
             <br/>
-            <div style="text-align:center; font-weight:bold; font-size:12px">
-                CONTACTO TALLER
-            </div>
+            <div style="...">CONTACTO {activeIndustry.placeLabel.toUpperCase()}</div>
             <div class="row" style="justify-content:center"><span>📞 ${shopConfig.shopPhone}</span></div>
             <div class="row" style="justify-content:center"><span>📍 ${shopConfig.shopAddress}</span></div>
             <div class="footer">Conserve este talón para retirar.</div>
@@ -864,16 +919,63 @@ const [serviceType, setServiceType] = useState(
                 <Button type="submit" className="w-full py-3.5 mt-2">Registrarme</Button>
             </form>
         )}
-        <div className="mt-8 pt-6 border-t border-slate-700/50 flex justify-center"><button onClick={()=>{setIsStaffLogin(!isStaffLogin);setLoginStep(1);setLoginDni('');setLoginPassword('');}} className="text-sm flex items-center gap-2 text-slate-500 hover:text-white transition-colors py-2 px-4 rounded-lg hover:bg-slate-800">{isStaffLogin?<>Volver al Acceso de Clientes</>:<><Lock size={14}/> Soy Personal Autorizado</>}</button></div>
+        <div className="mt-8 pt-6 border-t border-slate-700/50 flex justify-center"><button onClick={()=>{setIsStaffLogin(!isStaffLogin);setLoginStep(1);setLoginDni('');setLoginPassword('');}} className="text-sm flex items-center gap-2 text-slate-500 hover:text-white transition-colors py-2 px-4 rounded-lg hover:bg-slate-800">{isStaffLogin?<>Volver al Acceso de Clientes</>:<><Lock size={14}/> Soy Personal del {activeIndustry.placeLabel}</>}</button></div>
     </Card></div></div>
   );
 
   if (view === 'client-dashboard') return (
     <div className="min-h-screen bg-slate-950 pb-20"><Header /><main className="max-w-5xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-0">
-        <div className="lg:col-span-2"><h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><span className="bg-orange-600/20 text-orange-500 p-2 rounded-lg"><Plus size={24}/></span> Reservar Nuevo Turno</h2><Card><div className="mb-8"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">1. Selecciona un Día</h3>{renderDateSelector(setSelectedDate, selectedDate)}</div>{selectedDate && <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">2. Elige Horario</h3><div className="grid grid-cols-2 gap-4"><button onClick={()=>setSelectedTimeBlock('morning')} className={`p-5 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-300 ${selectedTimeBlock==='morning'?'bg-orange-600 border-orange-500 text-white shadow-orange-900/20 shadow-xl scale-[1.02]':'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'}`}><Sun size={28}/><span>Mañana</span><span className="text-xs opacity-60 font-mono bg-black/20 px-2 py-0.5 rounded">08:00 - 10:00</span></button><button onClick={()=>setSelectedTimeBlock('afternoon')} className={`p-5 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-300 ${selectedTimeBlock==='afternoon'?'bg-orange-600 border-orange-500 text-white shadow-orange-900/20 shadow-xl scale-[1.02]':'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'}`}><Moon size={28}/><span>Tarde</span><span className="text-xs opacity-60 font-mono bg-black/20 px-2 py-0.5 rounded">17:30 - 19:00</span></button></div></div>}{selectedDate && selectedTimeBlock && <div className="animate-in fade-in slide-in-from-top-4 duration-500"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">3. Confirmar Reserva</h3><div className="space-y-4 bg-slate-900/50 p-6 rounded-2xl border border-slate-800 mb-6"><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Tu Bici (Puedes editarla):</label><input value={clientBikeModel} onChange={e=>setClientBikeModel(e.target.value)} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="Ej: SLP 29 Pro" /></div><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Servicio:</label><select value={serviceType} onChange={e=>setServiceType(e.target.value)} className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none">{availableServices.map(s=><option key={s} value={s}>{s}</option>)}</select></div><div className="space-y-1"><label className="text-xs text-slate-400 font-semibold uppercase">Notas Adicionales:</label><textarea value={apptNotes} onChange={e=>setApptNotes(e.target.value)} rows="2" className="w-full bg-slate-950 border-slate-800 border rounded-xl p-3 text-white focus:ring-2 focus:ring-orange-500 outline-none resize-none" placeholder="¿Algún ruido raro? ¿Detalle específico?"/></div></div><Button onClick={createClientAppointment} disabled={isSubmitting} className="w-full py-4 text-lg shadow-orange-900/40">{isSubmitting ? <span className="flex items-center gap-2"><Loader2 className="animate-spin"/> Reservando...</span> : 'Confirmar Reserva'}</Button></div>}</Card></div>
+        <div className="lg:col-span-2"><h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3"><span className="bg-orange-600/20 text-orange-500 p-2 rounded-lg"><Plus size={24}/></span> Reservar Nuevo Turno</h2><Card><div className="mb-8"><h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">1. Selecciona un Día</h3>{renderDateSelector(setSelectedDate, selectedDate)}</div>{selectedDate && <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest">2. Elige Horario</h3>
+                
+                {shopConfig.scheduleMode === 'blocks' ? (
+                    /* --- MODO CLÁSICO (MAÑANA/TARDE) --- */
+                    <div className="grid grid-cols-2 gap-4">
+                        <button onClick={()=>setSelectedTimeBlock('morning')} className={`p-5 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-300 ${selectedTimeBlock==='morning'?'bg-orange-600 border-orange-500 text-white shadow-orange-900/20 shadow-xl scale-[1.02]':'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'}`}>
+                            <Sun size={28}/><span>Mañana</span><span className="text-xs opacity-60 font-mono bg-black/20 px-2 py-0.5 rounded">09:00 - 13:00</span>
+                        </button>
+                        <button onClick={()=>setSelectedTimeBlock('afternoon')} className={`p-5 rounded-2xl border flex flex-col items-center gap-2 transition-all duration-300 ${selectedTimeBlock==='afternoon'?'bg-orange-600 border-orange-500 text-white shadow-orange-900/20 shadow-xl scale-[1.02]':'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'}`}>
+                            <Moon size={28}/><span>Tarde</span><span className="text-xs opacity-60 font-mono bg-black/20 px-2 py-0.5 rounded">16:00 - 20:00</span>
+                        </button>
+                    </div>
+                ) : (
+                    /* --- NUEVO MODO (HORARIOS EXACTOS) --- */
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                        {generateTimeSlots().map((time) => {
+                            // Verificar si el horario ya está ocupado en la fecha seleccionada
+                            // NOTA: formatDateForQuery(selectedDate) debe coincidir con como guardas las fechas
+                            const dateStr = formatDateForQuery(selectedDate); 
+                            const isTaken = appointments.some(appt => 
+                                appt.dateString === dateStr && 
+                                appt.timeBlock === time && // Usamos timeBlock para guardar la hora exacta
+                                appt.status !== 'cancelado'
+                            );
+
+                            return (
+                                <button 
+                                    key={time} 
+                                    disabled={isTaken}
+                                    onClick={() => setSelectedTimeBlock(time)}
+                                    className={`
+                                        p-3 rounded-xl border text-sm font-bold transition-all
+                                        ${isTaken 
+                                            ? 'bg-slate-800/50 border-slate-800 text-slate-600 cursor-not-allowed line-through' 
+                                            : selectedTimeBlock === time 
+                                                ? 'bg-orange-600 border-orange-500 text-white shadow-lg' 
+                                                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
+                                        }
+                                    `}
+                                >
+                                    {time}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
         <div className="lg:col-span-1 space-y-6"><h2 className="text-xl font-bold text-white mb-4 flex items-center gap-3"><span className="bg-slate-800 text-slate-400 p-2 rounded-lg"><ClipboardList size={24}/></span> Mis Turnos</h2>{appointments.filter(a=>a.clientDni===appUser.dni).length===0?<div className="text-center py-16 bg-slate-900/50 rounded-3xl border-2 border-dashed border-slate-800"><Bike className="mx-auto text-slate-700 mb-4" size={64}/><p className="text-slate-500 font-medium">No tienes turnos activos.</p></div>:appointments.filter(a=>a.clientDni===appUser.dni).map(appt=>{
             const isFuture = new Date(appt.date) > new Date();
-            return <Card key={appt.id} className="relative group overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><ItemIcon size={80}/></div><div className="flex flex-col gap-3 relative z-10"><div className="flex justify-between items-center mb-1"><Badge status={appt.status}/><span className="text-xs font-mono text-slate-500 bg-slate-900 px-2 py-1 rounded">#{appt.orderId}</span></div><div><h3 className="text-lg font-bold text-white leading-tight">{appt.serviceType}</h3><p className="text-slate-400 text-sm mt-1">{appt.bikeModel}</p></div><div className="flex items-center gap-3 mt-2 bg-slate-900/60 p-3 rounded-xl text-sm text-slate-300 border border-slate-800"><Calendar size={16} className="text-orange-500"/><div className="flex flex-col leading-none"><span className="text-xs text-slate-500 font-bold uppercase">Fecha</span><span>{new Date(appt.date).toLocaleDateString()} • {appt.timeBlock==='morning'?'Mañana':'Tarde'}</span></div></div>{(appt.status === 'pendiente' && isFuture) && <Button variant="secondary" onClick={()=>openRescheduleModal(appt, 'client')} className="w-full text-xs mt-2 border-slate-700">Reprogramar (48hs)</Button>}</div></Card>
+            return <Card key={appt.id} className="relative group overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><ItemIcon size={80}/></div><div className="flex flex-col gap-3 relative z-10"><div className="flex justify-between items-center mb-1"><Badge status={appt.status} labels={activeIndustry.statusLabels} /><span className="text-xs font-mono text-slate-500 bg-slate-900 px-2 py-1 rounded">#{appt.orderId}</span></div><div><h3 className="text-lg font-bold text-white leading-tight">{appt.serviceType}</h3><p className="text-slate-400 text-sm mt-1">{appt.bikeModel}</p></div><div className="flex items-center gap-3 mt-2 bg-slate-900/60 p-3 rounded-xl text-sm text-slate-300 border border-slate-800"><Calendar size={16} className="text-orange-500"/><div className="flex flex-col leading-none"><span className="text-xs text-slate-500 font-bold uppercase">Fecha</span><span>{new Date(appt.date).toLocaleDateString()} • {appt.timeBlock==='morning'?'Mañana':'Tarde'}</span></div></div>{(appt.status === 'pendiente' && isFuture) && <Button variant="secondary" onClick={()=>openRescheduleModal(appt, 'client')} className="w-full text-xs mt-2 border-slate-700">Reprogramar (48hs)</Button>}</div></Card>
         })}</div>
         
         {/* Modal Reprogramar */}
@@ -943,7 +1045,7 @@ const [serviceType, setServiceType] = useState(
                             <div className="text-center"><h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">Nuevo Turno</h3><p className="text-slate-500 text-sm">Agendar Manualmente</p></div>
                         </Card>
                     </div>
-                    {filteredAppts.map(appt=><Card key={appt.id} className={`flex flex-col relative overflow-hidden ${appt.status==='listo'?'border-emerald-500/30 bg-emerald-900/5':''}`}><div className={`absolute top-0 left-0 w-1 h-full ${appt.status==='listo'?'bg-emerald-500':appt.status==='en-proceso'?'bg-blue-500':appt.status==='recibido'?'bg-amber-500':'bg-slate-600'}`}></div><div className="pl-3"><div className="flex justify-between items-start mb-3"><div><h3 className="text-white font-bold text-lg leading-tight line-clamp-1" title={appt.bikeModel}>{appt.bikeModel}</h3><div className="flex items-center gap-1.5 text-slate-400 text-xs mt-1.5 font-medium"><User size={12} className="text-slate-500"/> {appt.clientName}</div><div className="text-[10px] text-slate-500 mt-1 font-mono bg-slate-900/50 w-fit px-1.5 py-0.5 rounded">ID: #{appt.orderId || appt.id.slice(0,4)}</div></div><Badge status={appt.status}/></div><div className="flex-grow space-y-3 mb-5"><div className="bg-slate-900/50 p-2.5 rounded-lg border border-slate-800/50"><p className="text-blue-400 text-xs font-bold uppercase tracking-wide mb-1">Servicio</p><p className="text-slate-300 text-sm font-medium line-clamp-2">{appt.serviceType}</p></div><div className="flex flex-wrap gap-2 text-xs text-slate-400"><span className="bg-slate-950 px-2.5 py-1.5 rounded-md border border-slate-800 flex items-center gap-1.5"><Calendar size={12} className="text-slate-500"/> {new Date(appt.date).toLocaleDateString()}</span></div>{appt.mechanicName && <div className="text-xs text-slate-300 flex items-center gap-1.5 bg-blue-900/10 px-2 py-1 rounded border border-blue-900/20 w-fit"><Wrench size={10} className="text-blue-400"/> {appt.mechanicName}</div>}{appt.receivedBy && <div className="text-xs text-slate-300 flex items-center gap-1.5 mt-1 opacity-70">Recibido por: {appt.receivedBy}</div>}</div><div className="border-t border-slate-700/50 pt-4 grid gap-2">{appt.status==='pendiente' && <Button variant="secondary" className="text-xs w-full py-2.5 bg-slate-800 hover:bg-slate-700 border-slate-700" onClick={()=>setReceptionModal({appt, bikeModel:appt.bikeModel, serviceType:appt.serviceType, notes:appt.notes||''})}><FileText size={14}/> Recepcionar & Imprimir</Button>}{appt.status==='recibido' && <Button variant="admin" className="text-xs w-full py-2.5" onClick={()=>updateStatus(appt.id,'en-proceso')}><Wrench size={14}/> Iniciar Reparación</Button>}{appt.status==='en-proceso' && <Button variant="success" className="text-xs w-full py-2.5" onClick={()=>updateStatus(appt.id,'listo')}><CheckCircle size={14}/> Finalizar Trabajo</Button>}{appt.status==='listo' && <Button variant="whatsapp" className="text-xs w-full py-2.5" onClick={()=>sendWhatsApp(appt.clientPhone, appt.clientName, appt.bikeModel, appt.status)}><MessageCircle size={14}/> Avisar Retiro</Button>}<div className="flex justify-between pt-2 mt-1 relative z-10"><button onClick={()=>sendWhatsApp(appt.clientPhone, appt.clientName, appt.bikeModel, appt.status)} className="p-2 rounded-lg bg-slate-800 hover:bg-green-500/20 text-slate-400 hover:text-green-500 transition-colors border border-slate-700 hover:border-green-500/30" title="WhatsApp"><MessageCircle size={16}/></button>{appt.status!=='pendiente'&&<button onClick={()=>printServiceOrder(appt)} className="p-2 rounded-lg bg-slate-800 hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 transition-colors border border-slate-700 hover:border-blue-500/30" title="Reimprimir"><Printer size={16}/></button>}<button onClick={()=>updateStatus(appt.id,'pendiente')} className="p-2 rounded-lg bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors border border-slate-700 hover:border-red-500/30" title="Resetear"><RotateCcw size={16}/></button><button onClick={()=>openRescheduleModal(appt, 'admin')} className="p-2 rounded-lg bg-slate-800 hover:bg-orange-500/20 text-slate-400 hover:text-orange-400 transition-colors border border-slate-700 hover:border-orange-500/30" title="Reasignar Fecha"><Edit size={16}/></button><button onClick={()=>handleDeleteAppointment(appt.id)} className="p-2 rounded-lg bg-red-900/20 hover:bg-red-900/40 text-red-500 hover:text-red-400 transition-colors border border-red-500/30" title="Eliminar"><Trash2 size={16}/></button></div></div></div></Card>)}
+                    {filteredAppts.map(appt=><Card key={appt.id} className={`flex flex-col relative overflow-hidden ${appt.status==='listo'?'border-emerald-500/30 bg-emerald-900/5':''}`}><div className={`absolute top-0 left-0 w-1 h-full ${appt.status==='listo'?'bg-emerald-500':appt.status==='en-proceso'?'bg-blue-500':appt.status==='recibido'?'bg-amber-500':'bg-slate-600'}`}></div><div className="pl-3"><div className="flex justify-between items-start mb-3"><div><h3 className="text-white font-bold text-lg leading-tight line-clamp-1" title={appt.bikeModel}>{appt.bikeModel}</h3><div className="flex items-center gap-1.5 text-slate-400 text-xs mt-1.5 font-medium"><User size={12} className="text-slate-500"/> {appt.clientName}</div><div className="text-[10px] text-slate-500 mt-1 font-mono bg-slate-900/50 w-fit px-1.5 py-0.5 rounded">ID: #{appt.orderId || appt.id.slice(0,4)}</div></div><Badge status={appt.status} labels={activeIndustry.statusLabels} /></div><div className="flex-grow space-y-3 mb-5"><div className="bg-slate-900/50 p-2.5 rounded-lg border border-slate-800/50"><p className="text-blue-400 text-xs font-bold uppercase tracking-wide mb-1">Servicio</p><p className="text-slate-300 text-sm font-medium line-clamp-2">{appt.serviceType}</p></div><div className="flex flex-wrap gap-2 text-xs text-slate-400"><span className="bg-slate-950 px-2.5 py-1.5 rounded-md border border-slate-800 flex items-center gap-1.5"><Calendar size={12} className="text-slate-500"/> {new Date(appt.date).toLocaleDateString()}</span></div>{appt.mechanicName && <div className="text-xs text-slate-300 flex items-center gap-1.5 bg-blue-900/10 px-2 py-1 rounded border border-blue-900/20 w-fit"><Wrench size={10} className="text-blue-400"/> {appt.mechanicName}</div>}{appt.receivedBy && <div className="text-xs text-slate-300 flex items-center gap-1.5 mt-1 opacity-70">Recibido por: {appt.receivedBy}</div>}</div><div className="border-t border-slate-700/50 pt-4 grid gap-2">{appt.status==='pendiente' && <Button variant="secondary" className="text-xs w-full py-2.5 bg-slate-800 hover:bg-slate-700 border-slate-700" onClick={()=>setReceptionModal({appt, bikeModel:appt.bikeModel, serviceType:appt.serviceType, notes:appt.notes||''})}><FileText size={14}/> Recepcionar & Imprimir</Button>}{appt.status==='recibido' && <Button variant="admin" className="text-xs w-full py-2.5" onClick={()=>updateStatus(appt.id,'en-proceso')}><Wrench size={14}/> Iniciar Reparación</Button>}{appt.status==='en-proceso' && <Button variant="success" className="text-xs w-full py-2.5" onClick={()=>updateStatus(appt.id,'listo')}><CheckCircle size={14}/> Finalizar Trabajo</Button>}{appt.status==='listo' && <Button variant="whatsapp" className="text-xs w-full py-2.5" onClick={()=>sendWhatsApp(appt.clientPhone, appt.clientName, appt.bikeModel, appt.status)}><MessageCircle size={14}/> Avisar Retiro</Button>}<div className="flex justify-between pt-2 mt-1 relative z-10"><button onClick={()=>sendWhatsApp(appt.clientPhone, appt.clientName, appt.bikeModel, appt.status)} className="p-2 rounded-lg bg-slate-800 hover:bg-green-500/20 text-slate-400 hover:text-green-500 transition-colors border border-slate-700 hover:border-green-500/30" title="WhatsApp"><MessageCircle size={16}/></button>{appt.status!=='pendiente'&&<button onClick={()=>printServiceOrder(appt)} className="p-2 rounded-lg bg-slate-800 hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 transition-colors border border-slate-700 hover:border-blue-500/30" title="Reimprimir"><Printer size={16}/></button>}<button onClick={()=>updateStatus(appt.id,'pendiente')} className="p-2 rounded-lg bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors border border-slate-700 hover:border-red-500/30" title="Resetear"><RotateCcw size={16}/></button><button onClick={()=>openRescheduleModal(appt, 'admin')} className="p-2 rounded-lg bg-slate-800 hover:bg-orange-500/20 text-slate-400 hover:text-orange-400 transition-colors border border-slate-700 hover:border-orange-500/30" title="Reasignar Fecha"><Edit size={16}/></button><button onClick={()=>handleDeleteAppointment(appt.id)} className="p-2 rounded-lg bg-red-900/20 hover:bg-red-900/40 text-red-500 hover:text-red-400 transition-colors border border-red-500/30" title="Eliminar"><Trash2 size={16}/></button></div></div></div></Card>)}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full overflow-x-auto pb-4">
@@ -954,7 +1056,7 @@ const [serviceType, setServiceType] = useState(
                                 <div key={appt.id} className="bg-slate-800 p-3 rounded-xl border border-slate-700 shadow-sm hover:border-slate-500 transition cursor-pointer" onClick={()=>appt.status==='recibido' && updateStatus(appt.id,'en-proceso')}>
                                     <div className="flex justify-between mb-1"><span className="text-white font-bold">{appt.bikeModel}</span><span className="text-xs text-slate-500">#{appt.orderId}</span></div>
                                     <p className="text-xs text-slate-400 mb-2">{appt.clientName}</p>
-                                    <Badge status={appt.status}/>
+                                    <Badge status={appt.status} labels={activeIndustry.statusLabels} />
                                     {appt.status==='pendiente' && <div className="mt-2 text-xs text-orange-400 bg-orange-900/20 px-2 py-1 rounded">Esperando Recepción</div>}
                                 </div>
                             ))}
@@ -1030,7 +1132,7 @@ const [serviceType, setServiceType] = useState(
                 </div></Card>;
             })}</div></div>}
 
-        {subView === 'mechanics-mgmt' && appUser.isAdmin && <div className="max-w-3xl mx-auto"><Card className="mb-8 border-blue-500/30 shadow-blue-900/10"><div className="flex items-center gap-3 mb-6"><div className="bg-blue-500/20 p-3 rounded-full"><Shield size={24} className="text-blue-400"/></div><h3 className="text-2xl font-bold text-white">Gestión de Staff</h3></div><form onSubmit={addMechanic} className="grid grid-cols-1 md:grid-cols-3 gap-5 bg-slate-900/50 p-5 rounded-2xl border border-slate-800 mb-4"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</label><input required value={newMechName} onChange={e=>setNewMechName(e.target.value)} className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" placeholder="Nombre"/></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">DNI (Usuario)</label><input required value={newMechDni} onChange={e=>setNewMechDni(e.target.value)} type="number" className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" placeholder="DNI"/></div><div className="space-y-1 relative"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contraseña</label><input required value={newMechPassword} onChange={e=>setNewMechPassword(e.target.value)} type="text" className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" /><div className="absolute top-8 right-3 text-xs text-slate-600 select-none">Default</div></div><div className="md:col-span-3 flex items-center justify-between pt-2"><div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800"><input type="checkbox" checked={newMechIsAdmin} onChange={e=>setNewMechIsAdmin(e.target.checked)} className="rounded border-slate-700 bg-slate-800 text-blue-600 w-4 h-4"/><label className="text-sm text-slate-300 font-medium">¿Permisos de Admin?</label></div><Button type="submit" variant="admin" className="px-8"><Plus size={18}/> Crear Usuario</Button></div></form></Card><div className="space-y-3">{mechanics.map(m=><div key={m.id} className="flex justify-between items-center bg-slate-800/80 backdrop-blur-sm p-4 rounded-xl border border-slate-700 hover:border-slate-600 transition"><div className="flex items-center gap-4"><div className={`p-3 rounded-full ${m.isAdmin?'bg-blue-500/20 text-blue-400':'bg-slate-700 text-slate-400'}`}>{m.isAdmin?<Shield size={20}/>:<Wrench size={20}/>}</div><div><p className="text-white font-bold flex items-center gap-2 text-lg">{m.name}{m.isAdmin && <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30 uppercase tracking-wider font-bold">Admin</span>}</p><p className="text-sm text-slate-500 font-mono">DNI: {m.dni}</p></div></div><div className="flex gap-2"><Button variant="secondary" className="p-2.5 h-auto rounded-lg bg-slate-900 border-slate-800 hover:bg-slate-800" onClick={()=>triggerResetPassword(m.id, m.name)} title={`Resetear a ${GENERIC_PASS}`}><RotateCcw size={16}/></Button><Button variant="danger" className="p-2.5 h-auto rounded-lg" onClick={()=>triggerRemoveMechanic(m.id, m.name)}><Trash2 size={16}/></Button></div></div>)}</div></div>}
+        {subView === 'mechanics-mgmt' && appUser.isAdmin && <div className="max-w-3xl mx-auto"><Card className="mb-8 border-blue-500/30 shadow-blue-900/10"><div className="flex items-center gap-3 mb-6"><div className="bg-blue-500/20 p-3 rounded-full"><Shield size={24} className="text-blue-400"/></div><h3 className="text-2xl font-bold text-white">Gestión de {activeIndustry.staffLabel}s</h3></div><form onSubmit={addMechanic} className="grid grid-cols-1 md:grid-cols-3 gap-5 bg-slate-900/50 p-5 rounded-2xl border border-slate-800 mb-4"><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</label><input required value={newMechName} onChange={e=>setNewMechName(e.target.value)} className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" placeholder="Nombre"/></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">DNI (Usuario)</label><input required value={newMechDni} onChange={e=>setNewMechDni(e.target.value)} type="number" className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" placeholder="DNI"/></div><div className="space-y-1 relative"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contraseña</label><input required value={newMechPassword} onChange={e=>setNewMechPassword(e.target.value)} type="text" className="w-full bg-slate-950 text-white rounded-xl p-3 text-sm border border-slate-800 focus:border-blue-500 outline-none" /><div className="absolute top-8 right-3 text-xs text-slate-600 select-none">Default</div></div><div className="md:col-span-3 flex items-center justify-between pt-2"><div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800"><input type="checkbox" checked={newMechIsAdmin} onChange={e=>setNewMechIsAdmin(e.target.checked)} className="rounded border-slate-700 bg-slate-800 text-blue-600 w-4 h-4"/><label className="text-sm text-slate-300 font-medium">¿Permisos de Admin?</label></div><Button type="submit" variant="admin" className="px-8"><Plus size={18}/> Crear Usuario</Button></div></form></Card><div className="space-y-3">{mechanics.map(m=><div key={m.id} className="flex justify-between items-center bg-slate-800/80 backdrop-blur-sm p-4 rounded-xl border border-slate-700 hover:border-slate-600 transition"><div className="flex items-center gap-4"><div className={`p-3 rounded-full ${m.isAdmin?'bg-blue-500/20 text-blue-400':'bg-slate-700 text-slate-400'}`}>{m.isAdmin?<Shield size={20}/>:<Wrench size={20}/>}</div><div><p className="text-white font-bold flex items-center gap-2 text-lg">{m.name}{m.isAdmin && <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30 uppercase tracking-wider font-bold">Admin</span>}</p><p className="text-sm text-slate-500 font-mono">DNI: {m.dni}</p></div></div><div className="flex gap-2"><Button variant="secondary" className="p-2.5 h-auto rounded-lg bg-slate-900 border-slate-800 hover:bg-slate-800" onClick={()=>triggerResetPassword(m.id, m.name)} title={`Resetear a ${GENERIC_PASS}`}><RotateCcw size={16}/></Button><Button variant="danger" className="p-2.5 h-auto rounded-lg" onClick={()=>triggerRemoveMechanic(m.id, m.name)}><Trash2 size={16}/></Button></div></div>)}</div></div>}
         
         {subView === 'config' && <div className="max-w-2xl mx-auto space-y-8">
 
@@ -1085,16 +1187,72 @@ const [serviceType, setServiceType] = useState(
                 </div>
             </Card>
             {/* --- FIN SELECTOR --- */}
+            {/* --- CONFIGURACIÓN DE AGENDA --- */}
+            <Card className="mt-8 border-purple-500/30 shadow-purple-900/10">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Clock size={24} className="text-purple-400"/> 
+                        Configuración de Horarios
+                    </h3>
+                </div>
 
+                <div className="space-y-6">
+                    {/* Selector de MODO */}
+                    <div>
+                        <label className="block text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider">Tipo de Agenda</label>
+                        <div className="grid grid-cols-2 gap-4">
+                            <button 
+                                onClick={() => setShopConfig({...shopConfig, scheduleMode: 'blocks'})}
+                                className={`p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${shopConfig.scheduleMode === 'blocks' ? 'bg-purple-600 text-white border-purple-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
+                            >
+                                <Sun size={20}/> Por Bloques (Mañana/Tarde)
+                            </button>
+                            <button 
+                                onClick={() => setShopConfig({...shopConfig, scheduleMode: 'slots'})}
+                                className={`p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${shopConfig.scheduleMode === 'slots' ? 'bg-purple-600 text-white border-purple-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
+                            >
+                                <List size={20}/> Horarios Exactos (Turnos)
+                            </button>
+                        </div>
+                    </div>
 
+                    {/* Opciones extra si elige HORARIOS EXACTOS */}
+                    {shopConfig.scheduleMode === 'slots' && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Hora Apertura</label>
+                                <select value={shopConfig.openHour} onChange={e=>setShopConfig({...shopConfig, openHour: parseInt(e.target.value)})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3 text-white outline-none">
+                                    {[8,9,10,11,12,13,14].map(h => <option key={h} value={h}>{h}:00 hs</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Hora Cierre</label>
+                                <select value={shopConfig.closeHour} onChange={e=>setShopConfig({...shopConfig, closeHour: parseInt(e.target.value)})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3 text-white outline-none">
+                                    {[16,17,18,19,20,21,22,23].map(h => <option key={h} value={h}>{h}:00 hs</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Duración Turno</label>
+                                <select value={shopConfig.slotDuration} onChange={e=>setShopConfig({...shopConfig, slotDuration: parseInt(e.target.value)})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3 text-white outline-none">
+                                    <option value={30}>30 Minutos</option>
+                                    <option value={45}>45 Minutos</option>
+                                    <option value={60}>1 Hora</option>
+                                    <option value={90}>1 Hora 30min</option>
+                                </select>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </Card>
+            {/* --- FIN CONFIGURACIÓN DE AGENDA --- */}        
             <Card>
-                <div className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4"><h3 className="text-xl font-bold text-white flex items-center gap-2"><Settings size={24} className="text-slate-400"/> Configuración del Taller</h3>{configSuccess && <span className="text-emerald-400 text-sm font-bold animate-in fade-in bg-emerald-900/20 px-3 py-1 rounded-full border border-emerald-500/20">¡Cambios Guardados!</span>}</div>
+                <div className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4"><h3 className="text-xl font-bold text-white flex items-center gap-2"><Settings size={24} className="text-slate-400"/> Configuración del {activeIndustry.placeLabel}</h3>{configSuccess && <span className="text-emerald-400 text-sm font-bold animate-in fade-in bg-emerald-900/20 px-3 py-1 rounded-full border border-emerald-500/20">¡Cambios Guardados!</span>}</div>
                 <div className="space-y-8">
                     <div>
                         <label className="block text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider">Días Laborables</label>
                         <div className="flex gap-2 flex-wrap">{['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((day,idx)=><button key={idx} onClick={()=>{const n=shopConfig.workDays.includes(idx)?shopConfig.workDays.filter(d=>d!==idx):[...shopConfig.workDays,idx];setShopConfig({...shopConfig,workDays:n})}} className={`w-12 h-12 rounded-xl text-sm font-bold transition-all ${shopConfig.workDays.includes(idx)?'bg-orange-600 text-white shadow-lg shadow-orange-900/30 scale-110':'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}>{day.slice(0,3)}</button>)}</div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nombre del Taller</label><input value={shopConfig.shopName} onChange={e=>setShopConfig({...shopConfig,shopName:e.target.value})} className="w-full bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Teléfono</label><input value={shopConfig.shopPhone} onChange={e=>setShopConfig({...shopConfig,shopPhone:e.target.value})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Dirección</label><input value={shopConfig.shopAddress} onChange={e=>setShopConfig({...shopConfig,shopAddress:e.target.value})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Logo del Taller</label><div className="flex items-center gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">{shopConfig.logoUrl && <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-700 bg-black"><img src={shopConfig.logoUrl} className="w-full h-full object-cover"/><button onClick={()=>setShopConfig({...shopConfig, logoUrl: ''})} className="absolute top-0 right-0 bg-red-600 text-white p-1 rounded-bl hover:bg-red-700 transition"><Trash2 size={12}/></button></div>}<div className="flex-1"><label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-2 border border-slate-700"><Upload size={16}/> Subir Imagen <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload}/></label><p className="text-xs text-slate-500 mt-2">Recomendado: 200x200px. Máx 500KB.</p></div></div></div><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Límite de Turnos por Día</label><div className="flex items-center gap-4"><input type="number" value={shopConfig.maxPerDay} onChange={e=>setShopConfig({...shopConfig,maxPerDay:parseInt(e.target.value)})} className="w-24 bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition text-center font-bold text-lg" /><span className="text-slate-500 text-sm">turnos permitidos por jornada.</span></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nombre del {activeIndustry.placeLabel}</label><input value={shopConfig.shopName} onChange={e=>setShopConfig({...shopConfig,shopName:e.target.value})} className="w-full bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Teléfono</label><input value={shopConfig.shopPhone} onChange={e=>setShopConfig({...shopConfig,shopPhone:e.target.value})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Dirección</label><input value={shopConfig.shopAddress} onChange={e=>setShopConfig({...shopConfig,shopAddress:e.target.value})} className="w-full bg-slate-950 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition" /></div><div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Logo del {activeIndustry.placeLabel}</label><div className="flex items-center gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">{shopConfig.logoUrl && <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-700 bg-black"><img src={shopConfig.logoUrl} className="w-full h-full object-cover"/><button onClick={()=>setShopConfig({...shopConfig, logoUrl: ''})} className="absolute top-0 right-0 bg-red-600 text-white p-1 rounded-bl hover:bg-red-700 transition"><Trash2 size={12}/></button></div>}<div className="flex-1"><label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-2 border border-slate-700"><Upload size={16}/> Subir Imagen <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload}/></label><p className="text-xs text-slate-500 mt-2">Recomendado: 200x200px. Máx 500KB.</p></div></div></div><div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Límite de Turnos por Día</label><div className="flex items-center gap-4"><input type="number" value={shopConfig.maxPerDay} onChange={e=>setShopConfig({...shopConfig,maxPerDay:parseInt(e.target.value)})} className="w-24 bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white outline-none focus:border-blue-500 transition text-center font-bold text-lg" /><span className="text-slate-500 text-sm">turnos permitidos por jornada.</span></div></div>
                     <div><label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Inicio de Implementación</label><input type="date" value={shopConfig.implementationDate} onChange={e=>setShopConfig({...shopConfig,implementationDate:e.target.value})} className="w-full bg-slate-900 border-slate-800 rounded-xl p-3.5 text-white [color-scheme:dark] outline-none focus:border-blue-500 transition" /></div></div>
                     <Button onClick={()=>saveConfig()} className="w-full py-4 text-lg mt-4 shadow-blue-900/30">Guardar Cambios</Button>
                 </div>
