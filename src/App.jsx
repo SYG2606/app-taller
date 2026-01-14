@@ -138,7 +138,11 @@ const INDUSTRIES = {
 const GENERIC_PASS = "Turno2026";
 
 // --- HELPERS ---
-const formatDateForQuery = (d) => d.toISOString().split('T')[0];
+const formatDateForQuery = (d) => {
+  const date = d instanceof Date ? d : new Date(d);
+  return date.toISOString().split('T')[0];
+};
+
 const formatDisplayDate = (d) => {
   const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   return { dayName: days[d.getDay()], date: `${d.getDate()}/${d.getMonth()+1}` };
@@ -444,8 +448,9 @@ const [serviceType, setServiceType] = useState(
             d.setHours(hours, minutes, 0, 0);
         } else {
             // Si es bloque (legacy)
-            if (selectedTimeBlock === 'morning') d.setHours(9, 0, 0, 0); 
-            else d.setHours(18, 0, 0, 0);
+            if (selectedTimeBlock === 'morning') d.setHours(9, 0, 0, 0);
+            if (selectedTimeBlock === 'afternoon') d.setHours(18, 0, 0, 0);
+
         }
         
         const orderNum = await generateOrderNumber();
@@ -463,23 +468,59 @@ const [serviceType, setServiceType] = useState(
         setIsSubmitting(false);
     }
   };
-// --- GENERADOR DE HORARIOS (SLOTS) ---
-  const generateTimeSlots = () => {
-    const slots = [];
-    let currentTime = new Date();
-    currentTime.setHours(shopConfig.openHour, 0, 0, 0); // Hora inicio
 
-    const endTime = new Date();
-    endTime.setHours(shopConfig.closeHour, 0, 0, 0);    // Hora fin
+// --- STAFF ACTIONS ---
+const triggerResetPassword = async (id, name) => {
+  if (!window.confirm(`¿Resetear contraseña de ${name} a ${GENERIC_PASS}?`)) return;
 
-    while (currentTime < endTime) {
-      const timeString = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      slots.push(timeString);
-      // Sumar duración del turno
-      currentTime.setMinutes(currentTime.getMinutes() + shopConfig.slotDuration);
-    }
-    return slots;
-  };
+  try {
+    await updateDoc(
+      doc(db, 'artifacts', appId, 'public', 'data', 'mechanics', id),
+      { password: GENERIC_PASS, forcePasswordChange: true }
+    );
+    alert(`Contraseña de ${name} reseteada.`);
+  } catch (e) {
+    alert("Error al resetear contraseña");
+  }
+};
+
+const triggerRemoveMechanic = async (id, name) => {
+  if (!window.confirm(`¿Eliminar definitivamente a ${name}?`)) return;
+
+  try {
+    await deleteDoc(
+      doc(db, 'artifacts', appId, 'public', 'data', 'mechanics', id)
+    );
+    alert("Usuario eliminado.");
+  } catch (e) {
+    alert("Error al eliminar usuario");
+  }
+};
+    
+
+  // --- GENERADOR DE HORARIOS (SLOTS) ---
+  const generateTimeSlots = (baseDate) => {
+  if (!baseDate) return [];
+
+  const slots = [];
+  const currentTime = new Date(baseDate);
+  currentTime.setHours(shopConfig.openHour, 0, 0, 0);
+
+  const endTime = new Date(baseDate);
+  endTime.setHours(shopConfig.closeHour, 0, 0, 0);
+
+  while (currentTime < endTime) {
+    slots.push(
+      currentTime.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    );
+    currentTime.setMinutes(currentTime.getMinutes() + shopConfig.slotDuration);
+  }
+  return slots;
+};
+
   // --- LOGICA NUEVA PARA ADMIN APPOINTMENT ---
   const handleAdminDniSearch = async (e) => {
       e.preventDefault();
@@ -545,7 +586,8 @@ const [serviceType, setServiceType] = useState(
         setShowAdminApptModal(false); 
         setAdminApptStep(1);
         setAdminDniSearch('');
-        setAdminFormData({ name: '', bikeModel: '', phone: '', date: '', serviceType: SERVICE_TYPES[0], notes: '' });
+        setAdminFormData({ name: '', bikeModel: '', phone: '', date: '', serviceType: activeIndustry.defaultServices[0],
+, notes: '' });
     } catch (e) { alert("Error al crear: " + e.message); }
     finally { setIsSubmitting(false); }
   };
@@ -751,10 +793,11 @@ const [serviceType, setServiceType] = useState(
             <div class="title">NOTAS / ESTADO</div>
             <p style="font-size:11px; margin:0">${appt.notes || 'Sin observaciones.'}</p>
             
-            // Donde tenías el texto fijo "AUTORIZO LA REPARACIÓN..."
-<div class="disclaimer">
-    ${activeIndustry.disclaimer}
-</div>
+        <!-- Disclaimer dinámico -->
+
+        <div class="disclaimer">
+        ${activeIndustry.disclaimer}
+        </div>
             <br/><br/>
             <div class="row" style="margin-top:20px"><span>________________</span><span>________________</span></div>
             <div class="row"><span>Firma Cliente</span><span>Firma {activeIndustry.placeLabel}</span></div>
@@ -954,7 +997,7 @@ const [serviceType, setServiceType] = useState(
                 ) : (
                     /* --- NUEVO MODO (HORARIOS EXACTOS) --- */
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                        {generateTimeSlots().map((time) => {
+                        {generateTimeSlots(selectedDate).map((time) => {
                             // Verificar si el horario ya está ocupado en la fecha seleccionada
                             // NOTA: formatDateForQuery(selectedDate) debe coincidir con como guardas las fechas
                             const dateStr = formatDateForQuery(selectedDate); 
