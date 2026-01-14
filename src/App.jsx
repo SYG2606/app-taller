@@ -58,25 +58,23 @@ const INDUSTRIES = {
     label: "Taller de Bicicletas",
     itemLabel: "Modelo de Bici",
     staffLabel: "Mecánico",
-    placeLabel: "Taller", // <--- NUEVO
+    placeLabel: "Taller",
     actionLabel: "Reparar",
-    defaultServices: ["Mantenimiento General", "Revisión Frenos", "Parchado"],
+    defaultServices: ["Service 30 dias postcompra","Mantenimiento General", "Revisión 7 dias","Cambio de partes"],
     icons: { item: 'Bike', staff: 'Wrench' },
-    // NUEVO: Cómo se muestran los estados
     statusLabels: { 
         pending: 'En Espera', 
         received: 'En Taller', 
         process: 'En Reparación', 
         ready: 'Listo para Retirar' 
     },
-    // NUEVO: Texto legal para la impresión
     disclaimer: "AUTORIZO LA REPARACIÓN. EL TALLER NO SE RESPONSABILIZA POR EFECTOS PERSONALES DEJADOS EN LA UNIDAD."
   },
   tech: {
     label: "Servicio Técnico",
     itemLabel: "Dispositivo",
     staffLabel: "Técnico",
-    placeLabel: "Laboratorio", // <--- NUEVO
+    placeLabel: "Laboratorio",
     actionLabel: "Reparar",
     defaultServices: ["Diagnóstico", "Cambio Pantalla", "Formateo"],
     icons: { item: 'Smartphone', staff: 'Cpu' },
@@ -92,7 +90,7 @@ const INDUSTRIES = {
     label: "Estética y Belleza",
     itemLabel: "Cliente",
     staffLabel: "Estilista",
-    placeLabel: "Salón", // <--- NUEVO
+    placeLabel: "Salón",
     actionLabel: "Atender",
     defaultServices: ["Corte", "Color", "Manicura"],
     icons: { item: 'Sparkles', staff: 'Scissors' },
@@ -108,7 +106,7 @@ const INDUSTRIES = {
     label: "Complejo Deportivo",
     itemLabel: "Cancha",
     staffLabel: "Admin",
-    placeLabel: "Club", // <--- NUEVO
+    placeLabel: "Club",
     actionLabel: "Jugar",
     defaultServices: ["Cancha 60min", "Cancha 90min", "Clase"],
     icons: { item: 'Trophy', staff: 'User' },
