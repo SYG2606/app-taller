@@ -258,11 +258,8 @@ export default function App() {
   const [newMechName, setNewMechName] = useState('');
   const [newMechPassword, setNewMechPassword] = useState(GENERIC_PASS);
   const [newMechIsAdmin, setNewMechIsAdmin] = useState(false);
-  const filteredAppts = appointments.filter(a => {
-  const term = searchTerm.toLowerCase();
-      // ... lógica de filtrado ...
-      return match && status && date;
-  });
+  const filteredAppts = getFilteredAppointments();
+
 
   // --- HOTFIX: Inyectar Tailwind CSS CDN ---
   useEffect(() => {
