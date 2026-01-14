@@ -496,7 +496,7 @@ const triggerRemoveMechanic = async (id, name) => {
     alert("Error al eliminar usuario");
   }
 };
-    
+
 
   // --- GENERADOR DE HORARIOS (SLOTS) ---
   const generateTimeSlots = (baseDate) => {
@@ -586,8 +586,15 @@ const triggerRemoveMechanic = async (id, name) => {
         setShowAdminApptModal(false); 
         setAdminApptStep(1);
         setAdminDniSearch('');
-        setAdminFormData({ name: '', bikeModel: '', phone: '', date: '', serviceType: activeIndustry.defaultServices[0],
-, notes: '' });
+        setAdminFormData({ 
+  name: '', 
+  bikeModel: '', 
+  phone: '', 
+  date: '', 
+  serviceType: activeIndustry.defaultServices[0], 
+  notes: '' 
+});
+
     } catch (e) { alert("Error al crear: " + e.message); }
     finally { setIsSubmitting(false); }
   };
