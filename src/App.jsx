@@ -54,13 +54,16 @@ const IconMap = {
 
 // --- CONFIGURACIÓN MAESTRA MULTI-INDUSTRIA (SAAS) ---
 const INDUSTRIES = {
+  // ----------------------------------------------------
+  // INDUSTRIA 1: BICICLETAS
+  // ----------------------------------------------------
   bikes: {
     label: "Taller de Bicicletas",
     itemLabel: "Modelo de Bici",
     staffLabel: "Mecánico",
     placeLabel: "Taller",
     actionLabel: "Reparar",
-    defaultServices: ["Service 30 dias postcompra","Mantenimiento General", "Revisión 7 dias","Cambio de partes"],
+    defaultServices: ["Service 30 dias postcompra", "Mantenimiento General", "Revisión 7 dias", "Cambio de partes"],
     icons: { item: 'Bike', staff: 'Wrench' },
     statusLabels: { 
         pending: 'En Espera', 
@@ -69,7 +72,11 @@ const INDUSTRIES = {
         ready: 'Listo para Retirar' 
     },
     disclaimer: "AUTORIZO LA REPARACIÓN. EL TALLER NO SE RESPONSABILIZA POR EFECTOS PERSONALES DEJADOS EN LA UNIDAD."
-  },
+  }, // <--- ¡IMPORTANTE: ESTA COMA SEPARA BIKES DE TECH!
+
+  // ----------------------------------------------------
+  // INDUSTRIA 2: TECNOLOGÍA
+  // ----------------------------------------------------
   tech: {
     label: "Servicio Técnico",
     itemLabel: "Dispositivo",
@@ -85,7 +92,11 @@ const INDUSTRIES = {
         ready: 'Listo para Retirar' 
     },
     disclaimer: "AUTORIZO EL DIAGNÓSTICO Y REPARACIÓN. LA EMPRESA NO SE RESPONSABILIZA POR LA PÉRDIDA DE DATOS NO RESGUARDADOS."
-  },
+  }, // <--- ¡IMPORTANTE: ESTA COMA SEPARA TECH DE BEAUTY!
+
+  // ----------------------------------------------------
+  // INDUSTRIA 3: BELLEZA
+  // ----------------------------------------------------
   beauty: {
     label: "Estética y Belleza",
     itemLabel: "Cliente",
@@ -101,7 +112,11 @@ const INDUSTRIES = {
         ready: 'Finalizado' 
     },
     disclaimer: "EL CLIENTE ACEPTA LOS PROCEDIMIENTOS ESTÉTICOS A REALIZAR Y SUS POSIBLES CUIDADOS POSTERIORES."
-  },
+  }, // <--- ¡IMPORTANTE: ESTA COMA SEPARA BEAUTY DE SPORTS!
+
+  // ----------------------------------------------------
+  // INDUSTRIA 4: DEPORTES
+  // ----------------------------------------------------
   sports: {
     label: "Complejo Deportivo",
     itemLabel: "Cancha",
