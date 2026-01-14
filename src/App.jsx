@@ -258,7 +258,28 @@ export default function App() {
   const [newMechName, setNewMechName] = useState('');
   const [newMechPassword, setNewMechPassword] = useState(GENERIC_PASS);
   const [newMechIsAdmin, setNewMechIsAdmin] = useState(false);
-  const filteredAppts = getFilteredAppointments();
+  // --- FILTRADO DE TURNOS (CORREGIDO) ---
+  const filteredAppts = appointments.filter(a => {
+      const term = searchTerm.toLowerCase();
+      
+      // 1. Buscador (Match)
+      const orderStr = a.orderId ? a.orderId.toString() : '';
+      const match = orderStr.includes(term) || 
+                    (a.clientName || '').toLowerCase().includes(term) || 
+                    (a.bikeModel || '').toLowerCase().includes(term) || 
+                    (a.clientDni || '').includes(term);
+
+      // 2. Filtro de Estado
+      const status = statusFilter === 'all' || a.status === statusFilter;
+
+      // 3. Filtro de Fecha
+      let date = true;
+      if (dateFilterStart) {
+          date = new Date(a.date) >= new Date(dateFilterStart);
+      }
+
+      return match && status && date;
+  });
 
 
   // --- HOTFIX: Inyectar Tailwind CSS CDN ---
