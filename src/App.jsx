@@ -594,7 +594,7 @@ export default function App() {
     if (!loginDni || !loginPassword) return setLoginError("Faltan datos");
     setLoading(true);
     
-    // Caso 1: Crear primer Admin (Encriptado)
+    // Caso 1: Crear primer Admin (Encriptado) has
     if (mechanics.length === 0) {
         const hashedPassword = await bcrypt.hash(loginPassword, 10); // Encriptamos
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mechanics'), { 
