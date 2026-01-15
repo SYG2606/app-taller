@@ -633,16 +633,6 @@ export default function App() {
     }
   };
 
-    const mech = mechanics.find(m => m.dni === loginDni);
-    if (mech && mech.password === loginPassword) {
-        if (mech.forcePasswordChange) {
-            setTempStaffId(mech.id); setAppUser({ name: mech.name, role: 'mechanic', isAdmin: !!mech.isAdmin });
-            setView('force-change-password'); setLoading(false); return;
-        }
-        finalizeLogin({ name: mech.name, dni: loginDni, role: 'mechanic', isAdmin: !!mech.isAdmin });
-    } else { setLoginError("Credenciales inválidas"); setLoading(false); }
-  };
-
   const handleChangePassword = async (e) => {
       e.preventDefault();
       if (newPasswordForm.new !== newPasswordForm.confirm) return alert("No coinciden");
@@ -1071,8 +1061,6 @@ export default function App() {
         {/* Modal Reprogramar */}
         {rescheduleModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-lg relative bg-slate-900 border-slate-700 shadow-2xl"><button onClick={()=>setRescheduleModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><XCircle/></button><h3 className="text-xl font-bold text-white mb-4">Reprogramar Turno</h3><div className="mb-4">{renderDateSelector((d)=>setRescheduleModal({...rescheduleModal, date: d}), rescheduleModal.date)}</div>{rescheduleModal.date && <div className="grid grid-cols-2 gap-4 mb-4"><button onClick={()=>setRescheduleModal({...rescheduleModal, timeBlock:'morning'})} className={`p-3 rounded-xl border text-center ${rescheduleModal.timeBlock==='morning'?'bg-orange-600 text-white border-orange-500':'bg-slate-800 text-slate-400 border-slate-700'}`}>Mañana</button><button onClick={()=>setRescheduleModal({...rescheduleModal, timeBlock:'afternoon'})} className={`p-3 rounded-xl border text-center ${rescheduleModal.timeBlock==='afternoon'?'bg-orange-600 text-white border-orange-500':'bg-slate-800 text-slate-400 border-slate-700'}`}>Tarde</button></div>}<Button onClick={handleRescheduleSubmit} className="w-full">Confirmar Cambio</Button></Card></div>}
         
-        {/* Confirm Modal */}
-        {confirmModal && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-sm border-red-500/30 bg-slate-900 shadow-2xl"><div className="flex justify-center mb-4 text-red-500"><AlertCircle size={48} /></div><h3 className="text-xl font-bold text-white mb-2 text-center">{confirmModal.title}</h3><p className="text-slate-400 mb-6 text-center text-sm">{confirmModal.msg}</p><div className="flex gap-3"><Button variant={confirmModal.title.includes("No")?"secondary":"secondary"} onClick={()=>setConfirmModal(null)} className="flex-1 py-3">{confirmModal.title.includes("No")?"Entendido":"Cancelar"}</Button>{!confirmModal.title.includes("No") && <Button variant="danger" onClick={()=>{confirmModal.action();}} className="flex-1 py-3">Confirmar</Button>}</div></Card></div>}
         {/* --- MODAL DE CONFIRMACIÓN (FALTABA ESTO) --- */}
         {confirmModal && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200">
