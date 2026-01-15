@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import bcrypt from 'bcryptjs'; 
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, doc, updateDoc, deleteDoc, runTransaction, where, getDocs, setDoc } from 'firebase/firestore';
@@ -472,12 +473,12 @@ export default function App() {
   
   // Función para resetear clave de un mecánico
   const triggerResetPassword = async (id, name) => {
-      // Pedimos confirmación
       if (!window.confirm(`¿Resetear clave de ${name} a "${GENERIC_PASS}"?`)) return;
       
       try {
+          const hashedPassword = await bcrypt.hash(GENERIC_PASS, 10); // Encriptamos la genérica
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mechanics', id), {
-              password: GENERIC_PASS,
+              password: hashedPassword, // Guardamos hash
               forcePasswordChange: true
           });
           alert("Clave reseteada correctamente.");
@@ -485,6 +486,7 @@ export default function App() {
           alert("Error: " + e.message);
       }
   };
+  
 
   // Función para eliminar un mecánico
   const triggerRemoveMechanic = async (id, name) => {
@@ -592,11 +594,44 @@ export default function App() {
     if (!loginDni || !loginPassword) return setLoginError("Faltan datos");
     setLoading(true);
     
+    // Caso 1: Crear primer Admin (Encriptado)
     if (mechanics.length === 0) {
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mechanics'), { dni: loginDni, name: 'Admin Inicial', password: loginPassword, isAdmin: true, forcePasswordChange: false, createdAt: new Date().toISOString() });
+        const hashedPassword = await bcrypt.hash(loginPassword, 10); // Encriptamos
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mechanics'), { 
+            dni: loginDni, 
+            name: 'Admin Inicial', 
+            password: hashedPassword, // Guardamos hash
+            isAdmin: true, 
+            forcePasswordChange: false, 
+            createdAt: new Date().toISOString() 
+        });
         finalizeLogin({ name: 'Admin Inicial', dni: loginDni, role: 'mechanic', isAdmin: true });
         return;
     }
+
+    const mech = mechanics.find(m => m.dni === loginDni);
+    if (mech) {
+        // Caso 2: Login normal (Comparar hash)
+        const isValid = await bcrypt.compare(loginPassword, mech.password); // Comparamos
+        
+        if (isValid) {
+            if (mech.forcePasswordChange) {
+                setTempStaffId(mech.id); 
+                setAppUser({ name: mech.name, role: 'mechanic', isAdmin: !!mech.isAdmin }); 
+                setView('force-change-password'); 
+                setLoading(false);
+                return;
+            }
+            finalizeLogin({ name: mech.name, dni: loginDni, role: 'mechanic', isAdmin: !!mech.isAdmin });
+        } else {
+            setLoginError("Credenciales inválidas");
+            setLoading(false);
+        }
+    } else { 
+        setLoginError("Credenciales inválidas"); 
+        setLoading(false); 
+    }
+  };
 
     const mech = mechanics.find(m => m.dni === loginDni);
     if (mech && mech.password === loginPassword) {
@@ -611,7 +646,13 @@ export default function App() {
   const handleChangePassword = async (e) => {
       e.preventDefault();
       if (newPasswordForm.new !== newPasswordForm.confirm) return alert("No coinciden");
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mechanics', tempStaffId), { password: newPasswordForm.new, forcePasswordChange: false });
+      
+      const hashedPassword = await bcrypt.hash(newPasswordForm.new, 10); // Encriptamos
+      
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mechanics', tempStaffId), { 
+          password: hashedPassword, // Guardamos hash
+          forcePasswordChange: false 
+      });
       alert("Clave actualizada."); finalizeLogin({ ...appUser, dni: loginDni });
   };
 
@@ -716,8 +757,14 @@ export default function App() {
       if (mechanics.some(m => m.dni === newMechDni)) return alert("DNI ya registrado");
 
       try {
+        const hashedPassword = await bcrypt.hash(newMechPassword, 10); // Encriptamos
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mechanics'), {
-            dni: newMechDni, name: newMechName, password: newMechPassword, isAdmin: newMechIsAdmin, forcePasswordChange: true, createdAt: new Date().toISOString()
+            dni: newMechDni, 
+            name: newMechName, 
+            password: hashedPassword, // Guardamos hash
+            isAdmin: newMechIsAdmin, 
+            forcePasswordChange: true, 
+            createdAt: new Date().toISOString()
         });
         setNewMechDni(''); setNewMechName(''); setNewMechPassword(GENERIC_PASS); alert("Staff agregado correctamente.");
       } catch (err) { alert("Error al crear usuario: " + err.message); }
@@ -1026,6 +1073,34 @@ export default function App() {
         
         {/* Confirm Modal */}
         {confirmModal && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200"><Card className="w-full max-w-sm border-red-500/30 bg-slate-900 shadow-2xl"><div className="flex justify-center mb-4 text-red-500"><AlertCircle size={48} /></div><h3 className="text-xl font-bold text-white mb-2 text-center">{confirmModal.title}</h3><p className="text-slate-400 mb-6 text-center text-sm">{confirmModal.msg}</p><div className="flex gap-3"><Button variant={confirmModal.title.includes("No")?"secondary":"secondary"} onClick={()=>setConfirmModal(null)} className="flex-1 py-3">{confirmModal.title.includes("No")?"Entendido":"Cancelar"}</Button>{!confirmModal.title.includes("No") && <Button variant="danger" onClick={()=>{confirmModal.action();}} className="flex-1 py-3">Confirmar</Button>}</div></Card></div>}
+        {/* --- MODAL DE CONFIRMACIÓN (FALTABA ESTO) --- */}
+        {confirmModal && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200">
+                <Card className="w-full max-w-sm border-red-500/30 bg-slate-900 shadow-2xl">
+                    <div className="flex justify-center mb-4 text-red-500">
+                        <AlertCircle size={48} />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2 text-center">{confirmModal.title}</h3>
+                    <p className="text-slate-400 mb-6 text-center text-sm">{confirmModal.msg}</p>
+                    <div className="flex gap-3">
+                        <Button 
+                            variant="secondary" 
+                            onClick={()=>setConfirmModal(null)} 
+                            className="flex-1 py-3"
+                        >
+                            Cancelar
+                        </Button>
+                        <Button 
+                            variant="danger" 
+                            onClick={()=>{confirmModal.action();}} 
+                            className="flex-1 py-3"
+                        >
+                            Confirmar
+                        </Button>
+                    </div>
+                </Card>
+            </div>
+        )}
     </main></div>
   );
 
