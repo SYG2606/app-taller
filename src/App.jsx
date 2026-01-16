@@ -693,17 +693,20 @@ export default function App() {
       setReceptionModal(null);
   };
 
-  const handleDeleteAppointment = (id) => {
-      setConfirmModal({
-          title: 'Eliminar Turno',
-          msg: '¿Estás seguro de eliminar este turno de forma permanente?',
-          action: async () => {
-              try {
-                  await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'turnos', id));
-                  setConfirmModal(null);
-              } catch (e) { console.error(e); alert("Error: " + e.message); }
-          }
-      });
+  const handleDeleteAppointment = async (id) => {
+      // 1. Pregunta directa del navegador (Infalible)
+      if (!window.confirm("⚠️ ¿ESTÁS SEGURO?\n\nEsta acción eliminará el turno permanentemente.")) {
+          return; // Si dice "Cancelar", no hacemos nada
+      }
+
+      // 2. Si dice "Aceptar", borramos directo
+      try {
+          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'turnos', id));
+          alert("✅ Turno eliminado correctamente.");
+      } catch (e) {
+          console.error(e);
+          alert("❌ Error al borrar: " + e.message);
+      }
   };
 
   const openRescheduleModal = (appt, mode) => {
